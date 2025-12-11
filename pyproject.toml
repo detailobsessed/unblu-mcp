@@ -45,7 +45,7 @@ Gitter = "https://gitter.im/unblu-mcp/community"
 Funding = "https://github.com/sponsors/ichoosetoaccept"
 
 [project.scripts]
-unblu-mcp = "unblu_mcp.cli:main"
+unblu-mcp = "unblu_mcp._internal.cli:main"
 
 [dependency-groups]
 maintain = [
@@ -92,6 +92,7 @@ exclude = ["scripts/"]
 
 [tool.uv]
 default-groups = ["maintain", "ci", "docs", "local"]
+package = true
 
 [tool.poe.tasks]
 # Quality checks
