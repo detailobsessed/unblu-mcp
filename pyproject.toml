@@ -114,6 +114,9 @@ fix = ["format", "upgrade"]
 # Pre-commit
 pre-commit = "prek run --all-files"
 
+# MCP
+inspect = "npx -y @modelcontextprotocol/inspector uv run unblu-mcp"
+
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
 branch = "main"
