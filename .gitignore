@@ -17,9 +17,6 @@
 /site/
 uv.lock
 
-# Large API spec files (download separately)
-swagger.json
-
 # cache
 .cache/
 .pytest_cache/
