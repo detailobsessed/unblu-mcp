@@ -1,18 +1,10 @@
 # Changes here will be overwritten by Copier.
-_commit: 1.11.2
+_commit: 2.1.0
 _src_path: gh:ichoosetoaccept/copier-uv-bleeding
 author_email: ismar@gmail.com
 author_fullname: Ismar Iljazovic
 author_username: ichoosetoaccept
-copyright_date: '2025'
-copyright_holder: Ismar Iljazovic
-copyright_holder_email: ismar@gmail.com
 copyright_license: ISC
 project_description: A model context protocol server for interacting with Unblu deployments.
 project_name: unblu-mcp
-python_package_command_line_name: unblu-mcp
-python_package_distribution_name: unblu-mcp
-python_package_import_name: unblu_mcp
-repository_name: unblu-mcp
-repository_namespace: ichoosetoaccept
-repository_provider: github.com
+publish_to_pypi: false
