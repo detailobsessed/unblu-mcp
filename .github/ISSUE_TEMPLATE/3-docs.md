@@ -3,7 +3,7 @@ name: Documentation update
 about: Point at unclear, missing or outdated documentation.
 title: "docs: "
 labels: docs
-assignees: pawamoy
+assignees: [ichoosetoaccept]
 ---
 
 ### Is something unclear, missing or outdated in our documentation?

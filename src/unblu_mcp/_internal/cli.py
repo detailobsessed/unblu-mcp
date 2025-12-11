@@ -70,6 +70,9 @@ def main(args: list[str] | None = None) -> int:
         An exit code.
     """
     parser = get_parser()
+    if args == []:
+        parser.print_help()
+        return 0
     opts = parser.parse_args(args=args)
 
     server = _create_server(spec_path=opts.spec)
