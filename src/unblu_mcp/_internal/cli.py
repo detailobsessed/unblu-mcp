@@ -13,9 +13,12 @@ from __future__ import annotations
 
 import argparse
 import sys
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from unblu_mcp._internal import debug
+
+if TYPE_CHECKING:
+    from fastmcp import FastMCP
 
 
 class _DebugInfo(argparse.Action):
@@ -33,9 +36,25 @@ def get_parser() -> argparse.ArgumentParser:
     Returns:
         An argparse parser.
     """
-    parser = argparse.ArgumentParser(prog="unblu-mcp")
+    parser = argparse.ArgumentParser(
+        prog="unblu-mcp",
+        description="Unblu MCP Server - Token-efficient access to Unblu API",
+    )
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {debug._get_version()}")
     parser.add_argument("--debug-info", action=_DebugInfo, help="Print debug information.")
+    parser.add_argument(
+        "--spec",
+        type=str,
+        default=None,
+        help="Path to swagger.json OpenAPI spec file.",
+    )
+    parser.add_argument(
+        "--transport",
+        type=str,
+        choices=["stdio", "sse"],
+        default="stdio",
+        help="MCP transport type (default: stdio).",
+    )
     return parser
 
 
@@ -52,5 +71,14 @@ def main(args: list[str] | None = None) -> int:
     """
     parser = get_parser()
     opts = parser.parse_args(args=args)
-    print(opts)
+
+    server = _create_server(spec_path=opts.spec)
+    server.run(transport=opts.transport)
     return 0
+
+
+def _create_server(spec_path: str | None = None) -> FastMCP:
+    """Lazy import to avoid circular imports and top-level import issues."""
+    from unblu_mcp._internal.server import create_server  # noqa: PLC0415
+
+    return create_server(spec_path=spec_path)

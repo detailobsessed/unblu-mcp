@@ -4,13 +4,24 @@ from __future__ import annotations
 
 import pytest
 
-from unblu_mcp import main
+from unblu_mcp import get_parser, main
 from unblu_mcp._internal import debug
 
 
-def test_main() -> None:
-    """Basic CLI test."""
-    assert main([]) == 0
+def test_parser() -> None:
+    """Test CLI parser configuration."""
+    parser = get_parser()
+    assert parser.prog == "unblu-mcp"
+
+    # Test that parser accepts expected arguments
+    args = parser.parse_args(["--spec", "/path/to/spec.json", "--transport", "sse"])
+    assert args.spec == "/path/to/spec.json"
+    assert args.transport == "sse"
+
+    # Test defaults
+    args = parser.parse_args([])
+    assert args.spec is None
+    assert args.transport == "stdio"
 
 
 def test_show_help(capsys: pytest.CaptureFixture) -> None:
