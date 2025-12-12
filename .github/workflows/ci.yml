@@ -65,6 +65,9 @@ jobs:
         cache-dependency-glob: pyproject.toml
 
     - name: Install dependencies
+      run: uv sync --all-extras --dev
+
+    - name: Install dependencies (poe task)
       run: poe setup
 
     - name: Check if the documentation builds correctly
@@ -141,6 +144,11 @@ jobs:
         cache-suffix: ${{ matrix.resolution }}
 
     - name: Install dependencies
+      env:
+        UV_RESOLUTION: ${{ matrix.resolution }}
+      run: uv sync --all-extras --dev
+
+    - name: Install dependencies (poe task)
       env:
         UV_RESOLUTION: ${{ matrix.resolution }}
       run: poe setup
