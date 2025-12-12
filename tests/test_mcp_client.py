@@ -56,7 +56,7 @@ async def mock_mcp_client() -> AsyncIterator[Client[FastMCPTransport]]:
     """Create MCP client with minimal mock spec for unit tests."""
     # Write mock spec to temporary file
     mock_spec_path = Path(__file__).parent / "mock_swagger.json"
-    mock_spec_path.write_text(json.dumps(MOCK_SWAGGER))
+    mock_spec_path.write_text(json.dumps(MOCK_SWAGGER), encoding="utf-8")
 
     try:
         # Override base URL for testing

@@ -248,7 +248,7 @@ def create_server(
         else:
             raise FileNotFoundError("swagger.json not found. Please provide spec_path.")
 
-    with open(spec_path) as f:
+    with open(spec_path, encoding="utf-8") as f:
         spec = json.load(f)
 
     registry = UnbluAPIRegistry(spec)
