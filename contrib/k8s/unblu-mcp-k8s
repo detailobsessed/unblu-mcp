@@ -1,0 +1,191 @@
+#!/bin/bash
+# Kubernetes Port-Forward Wrapper for unblu-mcp
+# Handles kubectl port-forwarding for enterprise deployments where Unblu API
+# is only accessible via Kubernetes services.
+#
+# Usage: unblu-mcp-k8s [environment]
+#   environment: t1, t2, p1, e1 (default: auto-detect from kubectl context)
+#
+# This wrapper:
+# 1. Detects or sets the Kubernetes environment
+# 2. Starts kubectl port-forward to haproxy service
+# 3. Configures trusted headers authentication
+# 4. Launches the unblu-mcp server
+#
+# Environment Variables:
+#   UNBLU_MCP_PATH      - Path to unblu-mcp repo (if not installed globally)
+#   UNBLU_K8S_NAMESPACE - Override namespace pattern (default: appl-kop-{env})
+#   UNBLU_K8S_SERVICE   - Override service name (default: haproxy)
+#   UNBLU_K8S_PORT      - Override service port (default: 8080)
+#
+# Prerequisites:
+# - kubectl configured with appropriate contexts
+# - unblu-mcp installed (uv tool install unblu-mcp or from source)
+
+set -eo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# Port mapping per environment (must not conflict with each other)
+# Using function instead of associative array for bash 3.x compatibility
+get_port() {
+  case "$1" in
+    t1) echo 8084 ;;
+    t2) echo 8085 ;;
+    p1) echo 8086 ;;
+    e1) echo 8087 ;;
+    *) echo "" ;;
+  esac
+}
+
+is_valid_env() {
+  case "$1" in
+    t1|t2|p1|e1) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
+# Detect environment from kubectl context
+detect_environment() {
+  local context
+  context=$(kubectl config current-context 2>/dev/null || echo "")
+  
+  # shellcheck disable=SC2254
+  case "$context" in
+    *-t1-*|*-t1) echo "t1" ;;
+    *-t2-*|*-t2) echo "t2" ;;
+    *-p1-*|*-p1) echo "p1" ;;
+    *-e1-*|*-e1) echo "e1" ;;
+    *) echo "" ;;
+  esac
+}
+
+# Check if port-forward is already running
+is_port_forward_running() {
+  local port=$1
+  lsof -Pi ":${port}" -sTCP:LISTEN -t >/dev/null 2>&1
+}
+
+# Start port-forward
+start_port_forward() {
+  local env=$1
+  local port
+  port=$(get_port "$env")
+  local namespace="${UNBLU_K8S_NAMESPACE:-appl-kop-${env}}"
+  local service="${UNBLU_K8S_SERVICE:-haproxy}"
+  local svc_port="${UNBLU_K8S_PORT:-8080}"
+  
+  if is_port_forward_running "$port"; then
+    echo "✅ Port-forward already running on port ${port}" >&2
+    return 0
+  fi
+  
+  echo "🔌 Starting port-forward to ${namespace}/${service} on port ${port}..." >&2
+  kubectl port-forward -n "${namespace}" "svc/${service}" "${port}:${svc_port}" >/dev/null 2>&1 &
+  PORTFORWARD_PID=$!
+  
+  # Wait for port to become available
+  local attempts=0
+  while ! is_port_forward_running "$port"; do
+    sleep 0.5
+    attempts=$((attempts + 1))
+    if [ $attempts -ge 10 ]; then
+      echo "❌ Failed to start port-forward after 5 seconds" >&2
+      kill "$PORTFORWARD_PID" 2>/dev/null || true
+      exit 1
+    fi
+  done
+  
+  echo "✅ Port-forward ready (PID: ${PORTFORWARD_PID})" >&2
+}
+
+# Cleanup on exit
+cleanup() {
+  if [ -n "${PORTFORWARD_PID:-}" ] && kill -0 "$PORTFORWARD_PID" 2>/dev/null; then
+    echo "🧹 Stopping port-forward..." >&2
+    kill "$PORTFORWARD_PID" 2>/dev/null || true
+    wait "$PORTFORWARD_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
+
+# Find unblu-mcp command
+find_unblu_mcp() {
+  # Check if unblu-mcp is in PATH
+  if command -v unblu-mcp >/dev/null 2>&1; then
+    echo "unblu-mcp"
+    return 0
+  fi
+  
+  # Check UNBLU_MCP_PATH env var
+  if [ -n "${UNBLU_MCP_PATH:-}" ] && [ -f "${UNBLU_MCP_PATH}/pyproject.toml" ]; then
+    echo "uv run --directory ${UNBLU_MCP_PATH} unblu-mcp"
+    return 0
+  fi
+  
+  # Check if we're in the unblu-mcp repo
+  if [ -f "${SCRIPT_DIR}/../../pyproject.toml" ]; then
+    echo "uv run --directory ${SCRIPT_DIR}/../.. unblu-mcp"
+    return 0
+  fi
+  
+  echo ""
+}
+
+# Main
+main() {
+  local env="${1:-}"
+  shift || true  # Remove env from args if present
+  
+  # Auto-detect environment if not provided
+  if [ -z "$env" ]; then
+    env=$(detect_environment)
+    if [ -z "$env" ]; then
+      echo "❌ Could not detect environment from kubectl context." >&2
+      echo "   Please specify: $0 <t1|t2|p1|e1>" >&2
+      echo "   Or switch kubectl context to one containing the environment name" >&2
+      exit 1
+    fi
+    echo "🔍 Auto-detected environment: ${env}" >&2
+  fi
+  
+  # Validate environment
+  if ! is_valid_env "$env"; then
+    echo "❌ Invalid environment: ${env}" >&2
+    echo "   Valid options: t1, t2, p1, e1" >&2
+    exit 1
+  fi
+  
+  local port
+  port=$(get_port "$env")
+  
+  # Find unblu-mcp
+  local unblu_mcp_cmd
+  unblu_mcp_cmd=$(find_unblu_mcp)
+  if [ -z "$unblu_mcp_cmd" ]; then
+    echo "❌ unblu-mcp not found." >&2
+    echo "   Install with: uv tool install unblu-mcp" >&2
+    echo "   Or set UNBLU_MCP_PATH to the repo directory" >&2
+    exit 1
+  fi
+  
+  # Start port-forward
+  start_port_forward "$env"
+  
+  # Configure environment for unblu-mcp
+  export UNBLU_BASE_URL="http://localhost:${port}/kop/rest/v4"
+  
+  # Configure trusted headers authentication
+  export UNBLU_TRUSTED_HEADERS="x-unblu-trusted-user-id:superadmin,x-unblu-trusted-user-role:SUPER_ADMIN"
+  
+  echo "🚀 Starting unblu-mcp for ${env} environment..." >&2
+  echo "   Base URL: ${UNBLU_BASE_URL}" >&2
+  echo "   Auth: Trusted headers" >&2
+  echo "" >&2
+  
+  # Run unblu-mcp with any additional args
+  # shellcheck disable=SC2086
+  exec $unblu_mcp_cmd "$@"
+}
+
+main "$@"

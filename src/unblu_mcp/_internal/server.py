@@ -209,12 +209,32 @@ class UnbluAPIRegistry:
         return obj
 
 
+def _parse_trusted_headers(headers_str: str | None) -> dict[str, str]:
+    """Parse trusted headers from comma-separated key:value pairs.
+
+    Args:
+        headers_str: Format "key1:value1,key2:value2"
+
+    Returns:
+        Dictionary of header names to values.
+    """
+    if not headers_str:
+        return {}
+    headers = {}
+    for pair in headers_str.split(","):
+        if ":" in pair:
+            key, value = pair.split(":", 1)
+            headers[key.strip()] = value.strip()
+    return headers
+
+
 def create_server(
     spec_path: str | Path | None = None,
     base_url: str | None = None,
     api_key: str | None = None,
     username: str | None = None,
     password: str | None = None,
+    trusted_headers: dict[str, str] | None = None,
 ) -> FastMCP:
     """Create the Unblu MCP server with progressive disclosure tools.
 
@@ -224,6 +244,8 @@ def create_server(
         api_key: API key for authentication. Defaults to UNBLU_API_KEY env var.
         username: Username for basic auth. Defaults to UNBLU_USERNAME env var.
         password: Password for basic auth. Defaults to UNBLU_PASSWORD env var.
+        trusted_headers: Headers for trusted authentication (e.g., x-unblu-trusted-user-id).
+                        Defaults to UNBLU_TRUSTED_HEADERS env var (format: "key:value,key:value").
 
     Returns:
         Configured FastMCP server instance.
@@ -233,6 +255,8 @@ def create_server(
     api_key = api_key or os.environ.get("UNBLU_API_KEY")
     username = username or os.environ.get("UNBLU_USERNAME")
     password = password or os.environ.get("UNBLU_PASSWORD")
+    if trusted_headers is None:
+        trusted_headers = _parse_trusted_headers(os.environ.get("UNBLU_TRUSTED_HEADERS"))
 
     # Load OpenAPI spec
     if spec_path is None:
@@ -254,9 +278,12 @@ def create_server(
     registry = UnbluAPIRegistry(spec)
 
     # Create HTTP client with authentication
+    # Priority: trusted_headers > api_key > basic auth
     headers = {}
     auth = None
-    if api_key:
+    if trusted_headers:
+        headers.update(trusted_headers)
+    elif api_key:
         headers["Authorization"] = f"Bearer {api_key}"
     elif username and password:
         auth = httpx.BasicAuth(username, password)
