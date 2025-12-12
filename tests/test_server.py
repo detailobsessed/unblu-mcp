@@ -26,7 +26,7 @@ def swagger_spec() -> dict:
     spec_path = Path(__file__).parent.parent / "swagger.json"
     if not spec_path.exists():
         pytest.skip("swagger.json not found")
-    with open(spec_path) as f:
+    with open(spec_path, encoding="utf-8") as f:
         return json.load(f)
 
 
