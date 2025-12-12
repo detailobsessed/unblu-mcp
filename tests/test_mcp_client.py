@@ -190,7 +190,7 @@ class TestMetaTools:
         assert result.structured_content is not None
         assert isinstance(result.structured_content["result"], list)
         assert len(result.structured_content["result"]) == 1
-        assert result.structured_content["result"][0]["error"] == "Service 'NonExistent' not found. Available: ['Test']"
+        assert result.structured_content["result"][0]["error"] == "Service 'NonExistent' not found. Try: ['Test']..."
 
     @pytest.mark.asyncio
     async def test_search_operations_mock(self, mock_mcp_client: Client[FastMCPTransport]):
@@ -243,7 +243,7 @@ class TestMetaTools:
         assert result.data is not None
         assert result.structured_content is not None
         assert isinstance(result.structured_content, dict)
-        assert result.structured_content["error"] == "Operation 'nonexistent' not found."
+        assert result.structured_content["error"] == "Operation 'nonexistent' not found"
         assert "not found" in result.structured_content["error"]
 
 
@@ -299,8 +299,8 @@ class TestCallApi:
             assert result.structured_content is not None
             assert isinstance(result.structured_content, dict)
             assert result.structured_content["status"] == "error"
-            assert result.structured_content["status_code"] == 404
-            assert result.structured_content["error"] == {"error": "Not found"}
+            assert result.structured_content["code"] == 404
+            assert result.structured_content["error"] == "{'error': 'Not found'}"
 
     @pytest.mark.asyncio
     async def test_call_api_no_content(self, mock_mcp_client: Client[FastMCPTransport]):
@@ -356,7 +356,7 @@ class TestEdgeCases:
         assert result.data is not None
         assert result.structured_content is not None
         assert isinstance(result.structured_content, dict)
-        assert result.structured_content["error"] == "Operation 'invalid$id' not found."
+        assert result.structured_content["error"] == "Operation 'invalid$id' not found"
 
 
 @pytest.mark.asyncio

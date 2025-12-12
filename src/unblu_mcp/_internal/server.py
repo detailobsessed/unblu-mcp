@@ -53,6 +53,7 @@ class UnbluAPIRegistry:
         self.services: dict[str, ServiceInfo] = {}
         self.operations: dict[str, dict[str, Any]] = {}
         self.operations_by_service: dict[str, list[str]] = {}
+        self._schema_cache: dict[str, dict[str, Any]] = {}
         self._parse_spec()
 
     def _parse_spec(self) -> None:
@@ -152,11 +153,16 @@ class UnbluAPIRegistry:
         if not op:
             return None
 
+        # Check cache first
+        if operation_id in self._schema_cache:
+            cached = self._schema_cache[operation_id]
+            return OperationSchema(**cached)
+
         # Resolve $ref references in parameters and request body
         parameters = self._resolve_refs(op["parameters"])
         request_body = self._resolve_refs(op["request_body"]) if op["request_body"] else None
 
-        return OperationSchema(
+        schema = OperationSchema(
             operation_id=op["operation_id"],
             method=op["method"],
             path=op["path"],
@@ -166,6 +172,11 @@ class UnbluAPIRegistry:
             request_body=request_body,
             responses=op["responses"],
         )
+
+        # Cache the resolved schema
+        self._schema_cache[operation_id] = schema.model_dump()
+
+        return schema
 
     def _resolve_refs(self, obj: Any, depth: int = 0) -> Any:
         """Resolve $ref references in OpenAPI objects (limited depth to avoid huge expansions)."""
@@ -306,8 +317,8 @@ Example workflow:
         """
         operations = registry.list_operations(service)
         if not operations:
-            available = [s.name for s in registry.list_services()]
-            return [{"error": f"Service '{service}' not found. Available: {available}"}]
+            available = [s.name for s in registry.list_services()][:5]
+            return [{"error": f"Service '{service}' not found. Try: {available}..."}]
         return [op.model_dump() for op in operations]
 
     @mcp.tool()
@@ -342,7 +353,7 @@ Example workflow:
         """
         schema = registry.get_operation_schema(operation_id)
         if not schema:
-            return {"error": f"Operation '{operation_id}' not found."}
+            return {"error": f"Operation '{operation_id}' not found"}
         return schema.model_dump()
 
     @mcp.tool()
@@ -352,6 +363,8 @@ Example workflow:
         query_params: dict[str, Any] | None = None,
         body: dict[str, Any] | None = None,
         headers: dict[str, str] | None = None,
+        fields: list[str] | None = None,
+        max_response_size: int | None = None,
     ) -> dict[str, Any]:
         """Execute an Unblu API operation.
 
@@ -361,13 +374,53 @@ Example workflow:
             query_params: Query string parameters.
             body: Request body for POST/PUT/PATCH operations.
             headers: Additional headers to include.
+            fields: Optional list of field paths to include in response (e.g., ["id", "name", "items.id"]).
+            max_response_size: Maximum response size in bytes (approximate). Responses exceeding this
+                             will be truncated and marked as truncated.
 
         Returns:
             API response as JSON, or error details if the request failed.
         """
         op = registry.operations.get(operation_id)
         if not op:
-            return {"error": f"Operation '{operation_id}' not found."}
+            return {"error": f"Operation '{operation_id}' not found"}
+
+        def _filter_fields(data: Any, fields: list[str]) -> Any:
+            """Filter response data to include only specified field paths.
+
+            Args:
+                data: The response data to filter
+                fields: List of field paths (e.g., ["id", "name", "items.id"])
+
+            Returns:
+                Filtered data with only the requested fields
+            """
+            if not fields or not isinstance(data, dict):
+                return data
+
+            result = {}
+            for field_path in fields:
+                parts = field_path.split(".")
+                current = data
+                current_result = result
+
+                # Navigate through the path
+                for i, part in enumerate(parts):
+                    if isinstance(current, dict) and part in current:
+                        if i == len(parts) - 1:
+                            # Last part - include the value
+                            current_result[part] = current[part]
+                        else:
+                            # Intermediate part - ensure dict exists
+                            if part not in current_result:
+                                current_result[part] = {}
+                            current_result = current_result[part]
+                            current = current[part]
+                    else:
+                        # Path doesn't exist - skip
+                        break
+
+            return result
 
         # Build URL with path parameters
         path = op["path"]
@@ -377,8 +430,8 @@ Example workflow:
 
         # Check for unresolved path parameters
         if "{" in path:
-            missing = re.findall(r"\{(\w+)\}", path)
-            return {"error": f"Missing required path parameters: {missing}"}
+            missing = re.findall(r"\{(\w+)\}", path)[:3]
+            return {"error": f"Missing path params: {missing}"}
 
         # Build request
         method = op["method"].lower()
@@ -398,20 +451,45 @@ Example workflow:
                 return {"status": "success", "status_code": _HTTP_NO_CONTENT}
 
             try:
-                data = response.json()
+                raw_text = response.text
+                data = json.loads(raw_text)
             except json.JSONDecodeError:
-                data = {"raw_response": response.text[:1000]}
+                data = {"raw": response.text[:200]}
+
+            # Apply field filtering if requested
+            if fields and response.is_success and isinstance(data, dict):
+                data = _filter_fields(data, fields)
+
+            # Check response size and truncate if necessary
+            if max_response_size and response.is_success:
+                response_str = json.dumps(data, separators=(",", ":"))
+                if len(response_str.encode("utf-8")) > max_response_size:
+                    # Truncate to fit within limit
+                    truncated_data = {
+                        "_truncated": True,
+                        "_size": len(response_str.encode("utf-8")),
+                        "_limit": max_response_size,
+                        "data": None,
+                    }
+
+                    # Try to include a summary or first few items
+                    if isinstance(data, dict):
+                        truncated_data["data"] = {"keys": list(data.keys())[:10]}
+                    elif isinstance(data, list):
+                        truncated_data["data"] = {"count": len(data), "first_items": data[:3] if data else []}
+
+                    data = truncated_data
 
             if response.is_success:
                 return {"status": "success", "status_code": response.status_code, "data": data}
-            return {  # noqa: TRY300
+            return {
                 "status": "error",
-                "status_code": response.status_code,
-                "error": data,
+                "code": response.status_code,
+                "error": str(data)[:300] if data else "Unknown error",
             }
 
         except httpx.RequestError as e:
-            return {"status": "error", "error": str(e)}
+            return {"error": f"Request failed: {str(e)[:100]}"}
 
     return mcp
 
