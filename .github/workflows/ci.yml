@@ -78,7 +78,7 @@ jobs:
       run: uv run poe lint
 
     - name: Store objects inventory for tests
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13' }}
       with:
         name: objects.inv
