@@ -27,7 +27,7 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "fastmcp>=2.0.0",
+    "fastmcp>=2.14.0",
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "prek",
@@ -106,7 +106,7 @@ upgrade = "pyupgrade --py313-plus src/**/*.py tests/**/*.py"
 
 # Testing
 test = "pytest tests -c config/pytest.ini"
-test-cov = "pytest tests -c config/pytest.ini --cov=src --cov-report=html"
+test-cov = "pytest tests -c config/pytest.ini --cov=src --cov-report=term-missing --cov-report=html"
 
 # Combined tasks
 check = ["lint", "typecheck", "security", "deadcode"]

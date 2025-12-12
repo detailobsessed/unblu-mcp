@@ -1,14 +1,17 @@
 from __future__ import annotations
 
 import json
-import os
 import re
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from fastmcp import FastMCP
+from fastmcp.server.middleware.caching import CallToolSettings, ResponseCachingMiddleware
 from pydantic import BaseModel, Field
+
+if TYPE_CHECKING:
+    from unblu_mcp._internal.providers import ConnectionProvider
 
 # Constants for magic values
 _MAX_REF_DEPTH = 3
@@ -215,6 +218,7 @@ def create_server(
     api_key: str | None = None,
     username: str | None = None,
     password: str | None = None,
+    provider: ConnectionProvider | None = None,
 ) -> FastMCP:
     """Create the Unblu MCP server with progressive disclosure tools.
 
@@ -224,15 +228,25 @@ def create_server(
         api_key: API key for authentication. Defaults to UNBLU_API_KEY env var.
         username: Username for basic auth. Defaults to UNBLU_USERNAME env var.
         password: Password for basic auth. Defaults to UNBLU_PASSWORD env var.
+        provider: Optional connection provider for complex connectivity (e.g., K8s port-forward).
+                  If provided, overrides base_url/api_key/username/password.
 
     Returns:
         Configured FastMCP server instance.
     """
-    # Load configuration from environment
-    base_url = base_url or os.environ.get("UNBLU_BASE_URL", "https://unblu.cloud/app/rest/v4")
-    api_key = api_key or os.environ.get("UNBLU_API_KEY")
-    username = username or os.environ.get("UNBLU_USERNAME")
-    password = password or os.environ.get("UNBLU_PASSWORD")
+    from unblu_mcp._internal.providers import DefaultConnectionProvider  # noqa: PLC0415
+
+    # Use provider if given, otherwise create default provider from args/env
+    if provider is None:
+        provider = DefaultConnectionProvider(
+            base_url=base_url,
+            api_key=api_key,
+            username=username,
+            password=password,
+        )
+
+    # Get connection config from provider
+    config = provider.get_config()
 
     # Load OpenAPI spec
     if spec_path is None:
@@ -253,19 +267,12 @@ def create_server(
 
     registry = UnbluAPIRegistry(spec)
 
-    # Create HTTP client with authentication
-    headers = {}
-    auth = None
-    if api_key:
-        headers["Authorization"] = f"Bearer {api_key}"
-    elif username and password:
-        auth = httpx.BasicAuth(username, password)
-
+    # Create HTTP client from provider config
     client = httpx.AsyncClient(
-        base_url=base_url,
-        headers=headers,
-        auth=auth,
-        timeout=30.0,
+        base_url=config.base_url,
+        headers=config.headers,
+        auth=config.auth,
+        timeout=config.timeout,
     )
 
     # Create FastMCP server
@@ -291,7 +298,29 @@ Example workflow:
 """,
     )
 
-    @mcp.tool()
+    # Add response caching for discovery tools (static spec data)
+    # Cache list_services, list_operations, search_operations, get_operation_schema
+    # but NOT call_api (live API data)
+    mcp.add_middleware(
+        ResponseCachingMiddleware(
+            call_tool_settings=CallToolSettings(
+                included_tools=[
+                    "list_services",
+                    "list_operations",
+                    "search_operations",
+                    "get_operation_schema",
+                ],
+            ),
+        )
+    )
+
+    @mcp.tool(
+        annotations={
+            "title": "List API Services",
+            "readOnlyHint": True,
+            "openWorldHint": False,
+        },
+    )
     async def list_services() -> list[dict[str, Any]]:
         """List all available Unblu API service categories.
 
@@ -304,7 +333,13 @@ Example workflow:
         services = registry.list_services()
         return [s.model_dump() for s in services]
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations={
+            "title": "List Service Operations",
+            "readOnlyHint": True,
+            "openWorldHint": False,
+        },
+    )
     async def list_operations(service: str) -> list[dict[str, Any]]:
         """List all operations available in a specific service.
 
@@ -321,7 +356,13 @@ Example workflow:
             return [{"error": f"Service '{service}' not found. Try: {available}..."}]
         return [op.model_dump() for op in operations]
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations={
+            "title": "Search Operations",
+            "readOnlyHint": True,
+            "openWorldHint": False,
+        },
+    )
     async def search_operations(query: str, limit: int = 20) -> list[dict[str, Any]]:
         """Search for API operations by keyword.
 
@@ -337,7 +378,13 @@ Example workflow:
         operations = registry.search_operations(query, limit)
         return [op.model_dump() for op in operations]
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations={
+            "title": "Get Operation Schema",
+            "readOnlyHint": True,
+            "openWorldHint": False,
+        },
+    )
     async def get_operation_schema(operation_id: str) -> dict[str, Any]:
         """Get the full schema for a specific API operation.
 
@@ -356,7 +403,13 @@ Example workflow:
             return {"error": f"Operation '{operation_id}' not found"}
         return schema.model_dump()
 
-    @mcp.tool()
+    @mcp.tool(
+        annotations={
+            "title": "Execute API Call",
+            "readOnlyHint": False,
+            "openWorldHint": True,
+        },
+    )
     async def call_api(
         operation_id: str,
         path_params: dict[str, str] | None = None,
