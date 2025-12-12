@@ -31,6 +31,7 @@ ignore = [
     "ANN401",  # Dynamically typed expressions (typing.Any) are disallowed
     "ARG005",  # Unused lambda argument
     "C901",  # Too complex
+    "COM812",  # Trailing comma missing (conflicts with formatter)
     "D105",  # Missing docstring in magic method
     "D417",  # Missing argument description in the docstring
     "E501",  # Line too long
@@ -64,7 +65,9 @@ ignore = [
 ]
 "tests/**.py" = [
     "ARG005",  # Unused lambda argument
+    "ANN201",  # Missing return type annotation for public function
     "FBT001",  # Boolean positional arg in function definition
+    "PLC0415",  # Import should be at top-level of a file
     "PLR2004",  # Magic value used in comparison
     "S101",  # Use of assert detected
 ]

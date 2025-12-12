@@ -57,9 +57,11 @@ ci = [
     "duty",
     "ruff",
     "pytest",
+    "pytest-asyncio",
     "pytest-cov",
     "pytest-randomly",
     "pytest-xdist",
+    "respx",
     "ty",
     "poethepoet",
     "bandit",
@@ -90,6 +92,9 @@ docs = [
 [tool.ty.src]
 exclude = ["scripts/"]
 
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
 [tool.uv]
 default-groups = ["maintain", "ci", "docs", "local"]
 package = true
@@ -100,7 +105,7 @@ lint = "ruff check src tests duties.py scripts --config config/ruff.toml"
 format = "ruff format src tests duties.py scripts --config config/ruff.toml"
 typecheck = "ty check src tests duties.py scripts"
 security = "bandit -r src -c config/bandit.toml"
-deadcode = "vulture src tests"
+deadcode = "vulture src tests --min-confidence 80"
 upgrade = "pyupgrade --py313-plus src/**/*.py tests/**/*.py"
 
 # Testing
@@ -111,11 +116,11 @@ test-cov = "pytest tests -c config/pytest.ini --cov=src --cov-report=html"
 check = ["lint", "typecheck", "security", "deadcode"]
 fix = ["format", "upgrade"]
 
-# Pre-commit
-pre-commit = "prek run --all-files"
+# Run pre-commit hooks
+prek = "prek run --all-files"
 
 # MCP
-inspect = "npx -y @modelcontextprotocol/inspector uv run unblu-mcp"
+inspect = "DANGEROUSLY_OMIT_AUTH=true npx -y @modelcontextprotocol/inspector uv run unblu-mcp"
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
