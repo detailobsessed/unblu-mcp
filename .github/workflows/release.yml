@@ -1,6 +1,6 @@
 name: release
 
-on:
+"on":
   push:
     branches:
       - main
@@ -30,22 +30,17 @@ jobs:
     - name: Install dependencies
       run: uv sync --group maintain
 
-    - name: Python Semantic Release
-      id: release
-      uses: python-semantic-release/python-semantic-release@v9
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
+    - name: Semantic Release
+      env:
+        GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      run: uv run semantic-release version --changelog --push --tag --vcs-release
 
     # Uncomment to publish to PyPI:
     # - name: Publish to PyPI
-    #   if: ${{ steps.release.outputs.released == 'true' && secrets.PYPI_TOKEN != '' }}
-    #   uses: pypa/gh-action-pypi-publish@release/v1
-    #   with:
-    #     password: ${{ secrets.PYPI_TOKEN }}
-
-    - name: Publish to GitHub Releases
-      if: steps.release.outputs.released == 'true'
-      uses: python-semantic-release/publish-action@v9
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        tag: ${{ steps.release.outputs.tag }}
+    #   if: secrets.PYPI_TOKEN != ''
+    #   env:
+    #     PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
+    #   run: |
+    #     if [ -n "$PYPI_TOKEN" ]; then
+    #       uv publish --token $PYPI_TOKEN
+    #     fi
