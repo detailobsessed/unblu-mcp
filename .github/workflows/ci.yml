@@ -78,7 +78,7 @@ jobs:
       run: uv run poe lint
 
     - name: Store objects inventory for tests
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v5
       if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13' }}
       with:
         name: objects.inv
@@ -117,7 +117,7 @@ jobs:
         lfs: true
 
     - name: Setup Python
-      uses: actions/setup-python@v6
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
         allow-prereleases: true
@@ -135,7 +135,7 @@ jobs:
       run: uv run poe setup
 
     - name: Download objects inventory
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v5
       with:
         name: objects.inv
         path: site/
