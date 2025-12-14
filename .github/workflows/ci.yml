@@ -30,14 +30,21 @@ jobs:
     strategy:
       matrix:
         os:
-        - ubuntu-latest
-        - macos-latest
-        - blacksmith-4vcpu-windows-2025
+        - ubuntu
+        - macos
+        - windows
         python-version:
         - "3.13"
         - "3.14"
+        include:
+        - os: ubuntu
+          runner: blacksmith-4vcpu-ubuntu-2404
+        - os: macos
+          runner: macos-latest
+        - os: windows
+          runner: blacksmith-4vcpu-windows-2025
 
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
 
     steps:
     - name: Checkout
@@ -79,7 +86,7 @@ jobs:
 
     - name: Store objects inventory for tests
       uses: actions/upload-artifact@v6
-      if: ${{ matrix.os == 'ubuntu-latest' && matrix.python-version == '3.13' }}
+      if: ${{ matrix.os == 'ubuntu' && matrix.python-version == '3.13' }}
       with:
         name: objects.inv
         path: site/objects.inv
@@ -91,21 +98,28 @@ jobs:
     strategy:
       matrix:
         os:
-        - ubuntu-latest
-        - macos-latest
-        - blacksmith-4vcpu-windows-2025
+        - ubuntu
+        - macos
+        - windows
         python-version:
         - "3.13"
         - "3.14"
         resolution:
         - highest
         - lowest-direct
+        include:
+        - os: ubuntu
+          runner: blacksmith-4vcpu-ubuntu-2404
+        - os: macos
+          runner: macos-latest
+        - os: windows
+          runner: blacksmith-4vcpu-windows-2025
         exclude:
-        - os: macos-latest
+        - os: macos
           resolution: lowest-direct
-        - os: blacksmith-4vcpu-windows-2025
+        - os: windows
           resolution: lowest-direct
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.runner }}
     continue-on-error: true
 
     steps:
