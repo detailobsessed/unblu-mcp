@@ -310,6 +310,43 @@ class TestCreateServerEdgeCases:
         assert server is not None
 
 
+class TestEunomiaIntegration:
+    """Tests for Eunomia authorization middleware integration."""
+
+    def test_create_server_with_policy_file(self, tmp_path: Path) -> None:
+        """create_server accepts policy_file parameter."""
+        # Create a minimal policy file
+        policy_file = tmp_path / "test_policy.json"
+        policy_file.write_text(
+            json.dumps(
+                {
+                    "version": "1.0",
+                    "name": "test-policy",
+                    "default_effect": "allow",
+                    "rules": [],
+                }
+            )
+        )
+
+        spec_path = Path(__file__).parent.parent / "swagger.json"
+        server = create_server(spec_path=spec_path, policy_file=policy_file)
+        assert server is not None
+
+    def test_create_server_policy_file_not_found(self, tmp_path: Path) -> None:
+        """create_server raises FileNotFoundError for missing policy file."""
+        spec_path = Path(__file__).parent.parent / "swagger.json"
+        nonexistent_policy = tmp_path / "nonexistent.json"
+
+        with pytest.raises(FileNotFoundError, match=r"Policy file not found"):
+            create_server(spec_path=spec_path, policy_file=nonexistent_policy)
+
+    def test_create_server_without_policy_file(self) -> None:
+        """create_server works without policy_file (default behavior)."""
+        spec_path = Path(__file__).parent.parent / "swagger.json"
+        server = create_server(spec_path=spec_path, policy_file=None)
+        assert server is not None
+
+
 class TestGetServer:
     """Tests for get_server singleton function."""
 

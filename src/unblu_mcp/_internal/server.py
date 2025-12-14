@@ -219,6 +219,7 @@ def create_server(
     username: str | None = None,
     password: str | None = None,
     provider: ConnectionProvider | None = None,
+    policy_file: str | Path | None = None,
 ) -> FastMCP:
     """Create the Unblu MCP server with progressive disclosure tools.
 
@@ -230,6 +231,8 @@ def create_server(
         password: Password for basic auth. Defaults to UNBLU_PASSWORD env var.
         provider: Optional connection provider for complex connectivity (e.g., K8s port-forward).
                   If provided, overrides base_url/api_key/username/password.
+        policy_file: Optional path to Eunomia policy JSON file for authorization.
+                     Requires the 'safety' extra: pip install unblu-mcp[safety]
 
     Returns:
         Configured FastMCP server instance.
@@ -313,6 +316,21 @@ Example workflow:
             ),
         )
     )
+
+    # Add Eunomia authorization middleware if policy file is provided
+    if policy_file is not None:
+        try:
+            from eunomia_mcp import create_eunomia_middleware  # noqa: PLC0415
+
+            policy_path = Path(policy_file) if isinstance(policy_file, str) else policy_file
+            if not policy_path.exists():
+                raise FileNotFoundError(f"Policy file not found: {policy_path}")
+            middleware = create_eunomia_middleware(policy_file=str(policy_path))
+            mcp.add_middleware(middleware)
+        except ImportError as e:
+            raise ImportError(
+                "eunomia-mcp is required for policy-based authorization. Install with: pip install unblu-mcp[safety]"
+            ) from e
 
     @mcp.tool(
         annotations={
@@ -407,6 +425,8 @@ Example workflow:
         annotations={
             "title": "Execute API Call",
             "readOnlyHint": False,
+            "destructiveHint": True,
+            "idempotentHint": False,
             "openWorldHint": True,
         },
     )
