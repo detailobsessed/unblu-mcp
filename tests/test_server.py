@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
+from unittest.mock import patch
 
 import pytest
 
@@ -13,7 +14,9 @@ from unblu_mcp._internal.server import (
     OperationSchema,
     ServiceInfo,
     UnbluAPIRegistry,
+    _ServerHolder,
     create_server,
+    get_server,
 )
 
 if TYPE_CHECKING:
@@ -170,3 +173,170 @@ class TestTokenEfficiency:
         meta_tools = 5
         reduction_ratio = (total_operations - meta_tools) / total_operations
         assert reduction_ratio > 0.98, f"Expected >98% reduction, got {reduction_ratio:.2%}"
+
+
+class TestUnbluAPIRegistryEdgeCases:
+    """Tests for edge cases in UnbluAPIRegistry."""
+
+    def test_schema_caching(self, registry: UnbluAPIRegistry) -> None:
+        """Schema is cached after first retrieval."""
+        op_id = next(iter(registry.operations.keys()))
+
+        # First call populates cache
+        schema1 = registry.get_operation_schema(op_id)
+        assert schema1 is not None
+        assert op_id in registry._schema_cache
+
+        # Second call uses cache
+        schema2 = registry.get_operation_schema(op_id)
+        assert schema2 is not None
+        assert schema1.operation_id == schema2.operation_id
+
+    def test_resolve_refs_max_depth(self) -> None:
+        """_resolve_refs truncates at max depth."""
+        spec = {"tags": [], "paths": {}}
+        registry = UnbluAPIRegistry(spec)
+
+        # Create deeply nested refs
+        deep_obj = {"$ref": "#/components/schemas/Deep"}
+        result = registry._resolve_refs(deep_obj, depth=4)  # Beyond MAX_REF_DEPTH (3)
+        assert result == {"$ref": "...truncated for brevity..."}
+
+    def test_resolve_refs_unresolvable_ref(self) -> None:
+        """_resolve_refs returns original if ref cannot be resolved."""
+        spec = {"tags": [], "paths": {}}
+        registry = UnbluAPIRegistry(spec)
+
+        obj = {"$ref": "#/nonexistent/path"}
+        result = registry._resolve_refs(obj)
+        assert result == {"$ref": "#/nonexistent/path"}
+
+    def test_resolve_refs_external_ref(self) -> None:
+        """_resolve_refs returns original for external refs."""
+        spec = {"tags": [], "paths": {}}
+        registry = UnbluAPIRegistry(spec)
+
+        obj = {"$ref": "external.json#/schema"}
+        result = registry._resolve_refs(obj)
+        assert result == {"$ref": "external.json#/schema"}
+
+    def test_get_ref_invalid_path(self) -> None:
+        """_get_ref returns None for invalid paths."""
+        spec: dict = {"tags": [], "paths": {}, "components": {"schemas": {}}}
+        registry = UnbluAPIRegistry(spec)
+
+        # Path doesn't exist
+        assert registry._get_ref("#/components/schemas/NonExistent") is None
+
+        # Path traverses non-dict
+        spec["components"]["schemas"]["Test"] = "string_value"
+        assert registry._get_ref("#/components/schemas/Test/nested") is None
+
+    def test_parse_operation_without_tags(self) -> None:
+        """Operations without tags default to 'Other'."""
+        spec = {
+            "tags": [{"name": "Other", "description": "Other operations"}],
+            "paths": {
+                "/test": {
+                    "get": {
+                        "operationId": "testOp",
+                        "summary": "Test operation",
+                        # No tags specified
+                    }
+                }
+            },
+        }
+        registry = UnbluAPIRegistry(spec)
+        assert "testOp" in registry.operations
+        assert registry.operations["testOp"]["tags"] == ["Other"]
+
+    def test_parse_operation_generates_id(self) -> None:
+        """Operations without operationId get generated ID."""
+        spec = {
+            "tags": [{"name": "Test", "description": "Test"}],
+            "paths": {
+                "/api/resource": {
+                    "post": {
+                        "tags": ["Test"],
+                        "summary": "Create resource",
+                        # No operationId
+                    }
+                }
+            },
+        }
+        registry = UnbluAPIRegistry(spec)
+        # Should generate ID from method and path
+        assert "post_/api/resource" in registry.operations
+
+    def test_search_operations_scores_by_relevance(self, registry: UnbluAPIRegistry) -> None:
+        """Search results are ordered by relevance score."""
+        # Search for something that appears in operation IDs
+        results = registry.search_operations("conversation", limit=10)
+        assert len(results) > 0
+        # Results with "conversation" in ID should be first
+        assert "conversation" in results[0].operation_id.lower()
+
+
+class TestCreateServerEdgeCases:
+    """Tests for create_server edge cases."""
+
+    def test_create_server_spec_not_found(self, tmp_path: Path) -> None:
+        """create_server raises FileNotFoundError if spec not found."""
+        with (
+            patch("unblu_mcp._internal.server.Path.cwd", return_value=tmp_path),
+            pytest.raises(FileNotFoundError, match=r"swagger\.json not found"),
+        ):
+            create_server(spec_path=None)
+
+    def test_create_server_with_custom_provider(self) -> None:
+        """create_server accepts custom connection provider."""
+        from unblu_mcp._internal.providers import ConnectionConfig, ConnectionProvider
+
+        class CustomProvider(ConnectionProvider):
+            async def setup(self) -> None:
+                pass
+
+            async def teardown(self) -> None:
+                pass
+
+            def get_config(self) -> ConnectionConfig:
+                return ConnectionConfig(
+                    base_url="http://custom.example.com/api",
+                    headers={"X-Custom": "header"},
+                )
+
+        spec_path = Path(__file__).parent.parent / "swagger.json"
+        server = create_server(spec_path=spec_path, provider=CustomProvider())
+        assert server is not None
+
+
+class TestGetServer:
+    """Tests for get_server singleton function."""
+
+    def test_get_server_creates_instance(self) -> None:
+        """get_server creates server instance on first call."""
+        # Reset singleton
+        _ServerHolder.instance = None
+
+        with patch("unblu_mcp._internal.server.create_server") as mock_create:
+            from fastmcp import FastMCP
+
+            mock_server = FastMCP(name="test")
+            mock_create.return_value = mock_server
+
+            result = get_server()
+            assert result == mock_server
+            mock_create.assert_called_once()
+
+    def test_get_server_returns_cached_instance(self) -> None:
+        """get_server returns cached instance on subsequent calls."""
+        from fastmcp import FastMCP
+
+        mock_server = FastMCP(name="cached")
+        _ServerHolder.instance = mock_server
+
+        result = get_server()
+        assert result == mock_server
+
+        # Reset for other tests
+        _ServerHolder.instance = None

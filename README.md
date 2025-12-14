@@ -1,6 +1,6 @@
 # unblu-mcp
 
-[![ci](https://github.com/ichoosetoaccept/unblu-mcp/workflows/ci/badge.svg)](https://github.com/ichoosetoaccept/unblu-mcp/actions?query=workflow%3Aci)
+[![ci](https://github.com/ichoosetoaccept/unblu-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ichoosetoaccept/unblu-mcp/actions/workflows/ci.yml)
 [![documentation](https://img.shields.io/badge/docs-mkdocs-708FCC.svg?style=flat)](https://ichoosetoaccept.github.io/unblu-mcp/)
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for interacting with [Unblu](https://www.unblu.com/) deployments. This server provides AI assistants with token-efficient access to 300+ Unblu API endpoints through progressive disclosure.
@@ -16,7 +16,11 @@ This server implements best practices from Anthropic's guide on [building effect
 - **Field Filtering**: Request only the fields you need to reduce response size
 - **Response Truncation**: Limit response sizes to prevent token overflow
 
-Built with [FastMCP](https://github.com/jlowin/fastmcp) - the fast, Pythonic way to build MCP servers.
+Built with [FastMCP 2.14+](https://github.com/jlowin/fastmcp), leveraging cutting-edge features:
+
+- **MCP Annotations**: Tools include `readOnlyHint` and `openWorldHint` metadata for smarter AI decision-making
+- **Response Caching**: Discovery tools cache results via FastMCP middleware for faster repeated queries
+- **MCP 2025-11-25 Spec**: Full support for the latest Model Context Protocol specification
 
 ## Installation
 
