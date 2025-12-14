@@ -8,7 +8,10 @@ from typing import TYPE_CHECKING, Any
 import httpx
 from fastmcp import FastMCP
 from fastmcp.server.middleware.caching import CallToolSettings, ResponseCachingMiddleware
+from fastmcp.server.middleware.logging import LoggingMiddleware
 from pydantic import BaseModel, Field
+
+from unblu_mcp._internal.logging import _configure_file_logging
 
 if TYPE_CHECKING:
     from unblu_mcp._internal.providers import ConnectionProvider
@@ -314,6 +317,20 @@ Example workflow:
                     "get_operation_schema",
                 ],
             ),
+        )
+    )
+
+    # Configure file-based logging with daily rotation
+    # Logs are written to ~/.unblu-mcp/logs/unblu-mcp-YYYY-MM-DD.log
+    # Can be customized via UNBLU_MCP_LOG_DIR env var or disabled with UNBLU_MCP_LOG_DISABLE=1
+    _configure_file_logging()
+
+    # Add logging middleware for observability
+    # Logs tool calls with payloads to help identify usage patterns and errors
+    mcp.add_middleware(
+        LoggingMiddleware(
+            include_payloads=True,
+            max_payload_length=1000,
         )
     )
 

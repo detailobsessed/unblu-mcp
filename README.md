@@ -23,6 +23,7 @@ Built with [FastMCP 2.14+](https://github.com/jlowin/fastmcp), leveraging cuttin
 - **MCP Annotations**: Tools include `readOnlyHint`, `destructiveHint`, and `openWorldHint` metadata for smarter AI decision-making
 - **Response Caching**: Discovery tools cache results via FastMCP middleware for faster repeated queries
 - **Policy-Based Authorization**: Optional [Eunomia](https://github.com/whataboutyou-ai/eunomia) integration for controlling which API operations are allowed
+- **Built-in Logging**: Automatic file-based logging with daily rotation for debugging and usage analysis
 - **MCP 2025-11-25 Spec**: Full support for the latest Model Context Protocol specification
 
 ## Installation
@@ -163,6 +164,42 @@ unblu-mcp --version
 # Show debug info
 unblu-mcp --debug-info
 ```
+
+## Logging & Observability
+
+The server automatically logs all tool calls to help with debugging and usage analysis.
+
+### Log Location
+
+Logs are written to `~/.unblu-mcp/logs/` with daily rotation:
+
+```
+~/.unblu-mcp/logs/
+├── unblu-mcp-2025-01-15.log
+├── unblu-mcp-2025-01-14.log
+└── ...
+```
+
+### Configuration
+
+| Environment Variable | Description |
+|---------------------|-------------|
+| `UNBLU_MCP_LOG_DIR` | Custom log directory (default: `~/.unblu-mcp/logs`) |
+| `UNBLU_MCP_LOG_DISABLE` | Set to `1`, `true`, or `yes` to disable file logging |
+
+### Log Format
+
+```
+2025-01-15 14:30:22 | INFO     | fastmcp | tools/call request: call_api(operation_id="conversationsGetById", ...)
+```
+
+Logs include:
+- Timestamp (UTC)
+- Log level
+- Tool name and arguments
+- Response summaries
+
+Logs are retained for 30 days and automatically rotated at midnight UTC.
 
 ## Safety & Authorization
 
