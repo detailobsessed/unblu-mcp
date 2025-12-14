@@ -1,0 +1,87 @@
+{
+  "version": "1.0",
+  "name": "unblu-mcp-safety-policy",
+  "description": "Default safety policy for Unblu MCP server. Allows discovery tools, blocks destructive API operations.",
+  "default_effect": "deny",
+  "rules": [
+    {
+      "name": "allow-discovery-tools",
+      "effect": "allow",
+      "principal_conditions": [],
+      "resource_conditions": [
+        {
+          "path": "attributes.mcp_method",
+          "operator": "in",
+          "value": ["tools/list", "resources/list", "prompts/list"]
+        }
+      ],
+      "actions": ["access", "read"]
+    },
+    {
+      "name": "allow-read-only-tools",
+      "effect": "allow",
+      "principal_conditions": [],
+      "resource_conditions": [
+        {
+          "path": "attributes.tool_name",
+          "operator": "in",
+          "value": ["list_services", "list_operations", "search_operations", "get_operation_schema"]
+        }
+      ],
+      "actions": ["execute"]
+    },
+    {
+      "name": "allow-read-api-calls",
+      "effect": "allow",
+      "principal_conditions": [],
+      "resource_conditions": [
+        {
+          "path": "attributes.tool_name",
+          "operator": "eq",
+          "value": "call_api"
+        },
+        {
+          "path": "attributes.args.operation_id",
+          "operator": "in",
+          "value": [
+            "conversationsGetById",
+            "conversationsSearch",
+            "usersGetById",
+            "usersSearch",
+            "accountsGetById",
+            "accountsSearch",
+            "teamsGetById",
+            "teamsSearch",
+            "botsGetById",
+            "botsSearch"
+          ]
+        }
+      ],
+      "actions": ["execute"]
+    },
+    {
+      "name": "deny-destructive-api-calls",
+      "effect": "deny",
+      "principal_conditions": [],
+      "resource_conditions": [
+        {
+          "path": "attributes.tool_name",
+          "operator": "eq",
+          "value": "call_api"
+        },
+        {
+          "path": "attributes.args.operation_id",
+          "operator": "in",
+          "value": [
+            "conversationsDelete",
+            "usersDelete",
+            "accountsDelete",
+            "teamsDelete",
+            "botsDelete"
+          ]
+        }
+      ],
+      "actions": ["execute"]
+    }
+  ]
+}

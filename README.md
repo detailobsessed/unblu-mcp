@@ -5,6 +5,8 @@
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for interacting with [Unblu](https://www.unblu.com/) deployments. This server provides AI assistants with token-efficient access to 300+ Unblu API endpoints through progressive disclosure.
 
+> **🔒 Security First**: This server includes built-in safety controls. The `call_api` tool is marked with `destructiveHint: true` to trigger client confirmations, and optional [Eunomia](https://github.com/whataboutyou-ai/eunomia) integration provides server-side policy enforcement to block destructive operations. [Learn more →](#safety--authorization)
+
 ## Features
 
 This server implements best practices from Anthropic's guide on [building effective agents](https://www.anthropic.com/engineering/building-effective-agents):
@@ -18,8 +20,9 @@ This server implements best practices from Anthropic's guide on [building effect
 
 Built with [FastMCP 2.14+](https://github.com/jlowin/fastmcp), leveraging cutting-edge features:
 
-- **MCP Annotations**: Tools include `readOnlyHint` and `openWorldHint` metadata for smarter AI decision-making
+- **MCP Annotations**: Tools include `readOnlyHint`, `destructiveHint`, and `openWorldHint` metadata for smarter AI decision-making
 - **Response Caching**: Discovery tools cache results via FastMCP middleware for faster repeated queries
+- **Policy-Based Authorization**: Optional [Eunomia](https://github.com/whataboutyou-ai/eunomia) integration for controlling which API operations are allowed
 - **MCP 2025-11-25 Spec**: Full support for the latest Model Context Protocol specification
 
 ## Installation
@@ -151,12 +154,66 @@ unblu-mcp --transport sse
 # Use a custom swagger.json location
 unblu-mcp --spec /path/to/swagger.json
 
+# Run with Eunomia authorization policy (requires unblu-mcp[safety])
+unblu-mcp --policy /path/to/mcp_policies.json
+
 # Show version
 unblu-mcp --version
 
 # Show debug info
 unblu-mcp --debug-info
 ```
+
+## Safety & Authorization
+
+The `call_api` tool can execute **any** Unblu API operation, including destructive ones (DELETE, PUT, POST). This is a powerful capability that requires appropriate controls.
+
+### Two Layers of Protection
+
+| Layer | Type | Description |
+|-------|------|-------------|
+| **MCP Annotations** | Client-side | `destructiveHint: true` signals clients to prompt for confirmation |
+| **Eunomia Policies** | Server-side | Block unauthorized operations before they execute |
+
+### Layer 1: Tool Annotations (Built-in)
+
+The `call_api` tool includes these MCP annotations:
+- `destructiveHint: true` — Signals this tool may modify data
+- `idempotentHint: false` — Repeated calls may have different effects
+- `openWorldHint: true` — Interacts with external systems
+
+Well-behaved MCP clients (like Claude Desktop) will prompt for user confirmation before executing tools marked as destructive.
+
+### Layer 2: Policy-Based Authorization (Optional)
+
+For **server-side enforcement**, use [Eunomia](https://github.com/whataboutyou-ai/eunomia) to define what operations are allowed:
+
+```bash
+# Install with safety features
+pip install unblu-mcp[safety]
+
+# Run with policy enforcement
+unblu-mcp --policy config/mcp_policies.json
+```
+
+The included `config/mcp_policies.json` provides a sensible default:
+
+| Operation Type | Policy |
+|----------------|--------|
+| Discovery tools | ✅ Allowed |
+| Read-only API calls (GET) | ✅ Allowed |
+| Destructive API calls (DELETE) | ❌ Blocked |
+
+#### Custom Policies
+
+Generate a policy tailored to your server:
+
+```bash
+eunomia-mcp init --custom-mcp "unblu_mcp._internal.server:mcp"
+eunomia-mcp validate mcp_policies.json
+```
+
+See the [Eunomia documentation](https://github.com/whataboutyou-ai/eunomia) for advanced policy configuration.
 
 ## Development
 

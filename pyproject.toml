@@ -46,6 +46,11 @@ Funding = "https://github.com/sponsors/ichoosetoaccept"
 [project.scripts]
 unblu-mcp = "unblu_mcp._internal.cli:main"
 
+[project.optional-dependencies]
+safety = [
+    "eunomia-mcp>=0.3.10",
+]
+
 [dependency-groups]
 maintain = [
     "build>=1.2",

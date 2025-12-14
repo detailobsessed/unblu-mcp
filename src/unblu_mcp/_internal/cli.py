@@ -55,6 +55,12 @@ def get_parser() -> argparse.ArgumentParser:
         default="stdio",
         help="MCP transport type (default: stdio).",
     )
+    parser.add_argument(
+        "--policy",
+        type=str,
+        default=None,
+        help="Path to Eunomia policy JSON file for authorization. Requires unblu-mcp[safety].",
+    )
     return parser
 
 
@@ -75,13 +81,13 @@ def main(args: list[str] | None = None) -> int:
         return 0
     opts = parser.parse_args(args=args)
 
-    server = _create_server(spec_path=opts.spec)
+    server = _create_server(spec_path=opts.spec, policy_file=opts.policy)
     server.run(transport=opts.transport)
     return 0
 
 
-def _create_server(spec_path: str | None = None) -> FastMCP:
+def _create_server(spec_path: str | None = None, policy_file: str | None = None) -> FastMCP:
     """Lazy import to avoid circular imports and top-level import issues."""
     from unblu_mcp._internal.server import create_server  # noqa: PLC0415
 
-    return create_server(spec_path=spec_path)
+    return create_server(spec_path=spec_path, policy_file=policy_file)
