@@ -5,6 +5,19 @@
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for interacting with [Unblu](https://www.unblu.com/) deployments. This server provides AI assistants with token-efficient access to 300+ Unblu API endpoints through progressive disclosure.
 
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [Available Tools](#available-tools)
+- [Command Line Usage](#command-line-usage)
+- [Logging & Observability](#logging--observability)
+- [Safety & Authorization](#safety--authorization)
+- [Programmatic Usage](#programmatic-usage)
+- [Development](#development)
+- [License](#license)
+
 > **🔒 Security First**: This server includes built-in safety controls. The `call_api` tool is marked with `destructiveHint: true` to trigger client confirmations, and optional [Eunomia](https://github.com/whataboutyou-ai/eunomia) integration provides server-side policy enforcement to block destructive operations. [Learn more →](#safety--authorization)
 
 ## Features
@@ -253,19 +266,54 @@ unblu-mcp --policy config/mcp_policies.json
 
 The included `config/mcp_policies.json` provides a sensible default:
 
-| Operation Type | Policy |
-|----------------|--------|
-| Discovery tools | ✅ Allowed |
-| Read-only API calls (GET) | ✅ Allowed |
-| Destructive API calls (DELETE) | ❌ Blocked |
+| Operation Type | Policy | Examples |
+|----------------|--------|----------|
+| Discovery tools | ✅ Allowed | `list_services`, `list_operations`, `search_operations`, `get_operation_schema` |
+| Read-only API calls | ✅ Allowed | ~190 operations like `*Get*`, `*Search*`, `*List*`, `*Read*`, `*Find*`, `*Check*` |
+| Destructive API calls | ❌ Blocked | ~140 operations like `*Create*`, `*Update*`, `*Delete*`, `*Send*`, `*Login*`, etc. |
 
 #### Custom Policies
 
-Generate a policy tailored to your server:
+To allow additional operations beyond read-only, create a custom policy file. For example, to allow creating and updating conversations:
 
-```bash
-eunomia-mcp init --custom-mcp "unblu_mcp._internal.server:mcp"
-eunomia-mcp validate mcp_policies.json
+```json
+{
+  "version": "1.0",
+  "name": "custom-policy",
+  "default_effect": "deny",
+  "rules": [
+    {
+      "name": "allow-all-discovery",
+      "effect": "allow",
+      "resource_conditions": [
+        {"path": "attributes.tool_name", "operator": "in",
+         "value": ["list_services", "list_operations", "search_operations", "get_operation_schema"]}
+      ],
+      "actions": ["execute"]
+    },
+    {
+      "name": "allow-conversation-operations",
+      "effect": "allow",
+      "resource_conditions": [
+        {"path": "attributes.tool_name", "operator": "eq", "value": "call_api"},
+        {"path": "attributes.args.operation_id", "operator": "regex",
+         "value": "^conversations(Get|Search|Read|Create|Update|Set)"}
+      ],
+      "actions": ["execute"]
+    }
+  ]
+}
+```
+
+To allow **all** operations (no restrictions):
+
+```json
+{
+  "version": "1.0",
+  "name": "allow-all",
+  "default_effect": "allow",
+  "rules": []
+}
 ```
 
 See the [Eunomia documentation](https://github.com/whataboutyou-ai/eunomia) for advanced policy configuration.

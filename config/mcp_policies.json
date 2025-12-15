@@ -1,7 +1,7 @@
 {
   "version": "1.0",
   "name": "unblu-mcp-safety-policy",
-  "description": "Default safety policy for Unblu MCP server. Allows discovery tools, blocks destructive API operations.",
+  "description": "Default safety policy for Unblu MCP server. Allows discovery tools and read-only API operations, blocks destructive operations.",
   "default_effect": "deny",
   "rules": [
     {
@@ -42,19 +42,8 @@
         },
         {
           "path": "attributes.args.operation_id",
-          "operator": "in",
-          "value": [
-            "conversationsGetById",
-            "conversationsSearch",
-            "usersGetById",
-            "usersSearch",
-            "accountsGetById",
-            "accountsSearch",
-            "teamsGetById",
-            "teamsSearch",
-            "botsGetById",
-            "botsSearch"
-          ]
+          "operator": "regex",
+          "value": "^[a-zA-Z]*(Get|Search|List|Find|Read|Is|Has|Can|Check|Count|Exists|ProductVersion|Ping)[A-Za-z]*$"
         }
       ],
       "actions": ["execute"]
@@ -71,14 +60,8 @@
         },
         {
           "path": "attributes.args.operation_id",
-          "operator": "in",
-          "value": [
-            "conversationsDelete",
-            "usersDelete",
-            "accountsDelete",
-            "teamsDelete",
-            "botsDelete"
-          ]
+          "operator": "regex",
+          "value": "(Create|Update|Delete|Set|Add|Remove|Clear|Reset|Send|Post|Put|Patch|Login|Logout|Impersonate|Start|Stop|Forward|Invite|Revoke|Approve|Reject|Pause|Resume|Transform|Migrate|Generate|Invalidate|Offboard|Requeue|Renew|Install|Authenticate|Delivered|SentSuccessfully|Disable|Enable|Finish|End|Export|Change|Write|Trigger|Switch|Restart)"
         }
       ],
       "actions": ["execute"]
