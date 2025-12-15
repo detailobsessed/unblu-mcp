@@ -8,7 +8,9 @@ from typing import TYPE_CHECKING, Any
 
 import httpx
 from fastmcp import FastMCP
+from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware.caching import CallToolSettings, ResponseCachingMiddleware
+from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware
 from pydantic import BaseModel, Field
 
@@ -332,6 +334,10 @@ Example workflow:
     # Can be customized via UNBLU_MCP_LOG_DIR env var or disabled with UNBLU_MCP_LOG_DISABLE=1
     _configure_file_logging()
 
+    # Add error handling middleware for consistent error logging and tracking
+    # This catches exceptions, logs them, and converts to proper MCP error responses
+    mcp.add_middleware(ErrorHandlingMiddleware())
+
     # Add logging middleware for observability
     # Logs tool calls with payloads to help identify usage patterns and errors
     mcp.add_middleware(
@@ -395,7 +401,7 @@ Example workflow:
         operations = registry.list_operations(service)
         if not operations:
             available = [s.name for s in registry.list_services()][:5]
-            return [{"error": f"Service '{service}' not found. Try: {available}..."}]
+            raise ToolError(f"Service '{service}' not found. Available services include: {available}")
         return [op.model_dump() for op in operations]
 
     @mcp.tool(
@@ -442,7 +448,9 @@ Example workflow:
         """
         schema = registry.get_operation_schema(operation_id)
         if not schema:
-            return {"error": f"Operation '{operation_id}' not found"}
+            raise ToolError(
+                f"Operation '{operation_id}' not found. Use search_operations() to find valid operation IDs."
+            )
         return schema.model_dump()
 
     @mcp.tool(
@@ -480,7 +488,9 @@ Example workflow:
         """
         op = registry.operations.get(operation_id)
         if not op:
-            return {"error": f"Operation '{operation_id}' not found"}
+            raise ToolError(
+                f"Operation '{operation_id}' not found. Use search_operations() to find valid operation IDs."
+            )
 
         def _filter_fields(data: Any, fields: list[str]) -> Any:
             """Filter response data to include only specified field paths.
@@ -528,7 +538,9 @@ Example workflow:
         # Check for unresolved path parameters
         if "{" in path:
             missing = re.findall(r"\{(\w+)\}", path)[:3]
-            return {"error": f"Missing path params: {missing}"}
+            raise ToolError(
+                f"Missing required path parameters: {missing}. Use get_operation_schema() to see required parameters."
+            )
 
         # Build request
         method = op["method"].lower()
@@ -586,7 +598,7 @@ Example workflow:
             }
 
         except httpx.RequestError as e:
-            return {"error": f"Request failed: {str(e)[:100]}"}
+            raise ToolError(f"API request failed: {e!s}") from e
 
     return mcp
 

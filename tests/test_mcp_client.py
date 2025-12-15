@@ -10,6 +10,7 @@ import httpx
 import pytest
 import respx
 from fastmcp.client import Client
+from fastmcp.exceptions import ToolError
 
 from unblu_mcp._internal.server import create_server
 
@@ -184,13 +185,9 @@ class TestMetaTools:
 
     @pytest.mark.asyncio
     async def test_list_operations_not_found(self, mock_mcp_client: Client[FastMCPTransport]):
-        """Test list_operations with non-existent service."""
-        result = await mock_mcp_client.call_tool("list_operations", {"service": "NonExistent"})
-
-        assert result.structured_content is not None
-        assert isinstance(result.structured_content["result"], list)
-        assert len(result.structured_content["result"]) == 1
-        assert result.structured_content["result"][0]["error"] == "Service 'NonExistent' not found. Try: ['Test']..."
+        """Test list_operations with non-existent service raises ToolError."""
+        with pytest.raises(ToolError, match=r"Service 'NonExistent' not found"):
+            await mock_mcp_client.call_tool("list_operations", {"service": "NonExistent"})
 
     @pytest.mark.asyncio
     async def test_search_operations_mock(self, mock_mcp_client: Client[FastMCPTransport]):
@@ -237,14 +234,9 @@ class TestMetaTools:
 
     @pytest.mark.asyncio
     async def test_get_operation_schema_not_found(self, mock_mcp_client: Client[FastMCPTransport]):
-        """Test get_operation_schema with non-existent operation."""
-        result = await mock_mcp_client.call_tool("get_operation_schema", {"operation_id": "nonexistent"})
-
-        assert result.data is not None
-        assert result.structured_content is not None
-        assert isinstance(result.structured_content, dict)
-        assert result.structured_content["error"] == "Operation 'nonexistent' not found"
-        assert "not found" in result.structured_content["error"]
+        """Test get_operation_schema with non-existent operation raises ToolError."""
+        with pytest.raises(ToolError, match=r"Operation 'nonexistent' not found"):
+            await mock_mcp_client.call_tool("get_operation_schema", {"operation_id": "nonexistent"})
 
 
 @pytest.mark.asyncio
@@ -350,13 +342,9 @@ class TestEdgeCases:
 
     @pytest.mark.asyncio
     async def test_invalid_operation_id_schema(self, mock_mcp_client: Client[FastMCPTransport]):
-        """Test schema request with invalid operation ID format."""
-        result = await mock_mcp_client.call_tool("get_operation_schema", {"operation_id": "invalid$id"})
-
-        assert result.data is not None
-        assert result.structured_content is not None
-        assert isinstance(result.structured_content, dict)
-        assert result.structured_content["error"] == "Operation 'invalid$id' not found"
+        """Test schema request with invalid operation ID format raises ToolError."""
+        with pytest.raises(ToolError, match=r"Operation 'invalid\$id' not found"):
+            await mock_mcp_client.call_tool("get_operation_schema", {"operation_id": "invalid$id"})
 
 
 @pytest.mark.asyncio

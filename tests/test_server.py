@@ -7,7 +7,9 @@ from pathlib import Path
 from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
+import httpx
 import pytest
+from fastmcp.exceptions import ToolError
 
 from unblu_mcp._internal.server import (
     OperationInfo,
@@ -381,3 +383,59 @@ class TestGetServer:
 
         # Reset for other tests
         _ServerHolder.instance = None
+
+
+class TestToolErrorHandling:
+    """Tests for ToolError handling in MCP tools."""
+
+    @pytest.fixture
+    def server_with_tools(self) -> FastMCP:
+        """Create server with access to tool functions."""
+        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
+        return create_server(spec_path=spec_path)
+
+    @pytest.mark.anyio
+    async def test_list_operations_unknown_service_raises_tool_error(self, server_with_tools: FastMCP) -> None:
+        """list_operations raises ToolError for unknown service."""
+        tool = server_with_tools._tool_manager._tools["list_operations"]
+        with pytest.raises(ToolError, match=r"Service 'NonExistentService' not found"):
+            await tool.fn(service="NonExistentService")  # ty: ignore[unresolved-attribute]
+
+    @pytest.mark.anyio
+    async def test_get_operation_schema_unknown_raises_tool_error(self, server_with_tools: FastMCP) -> None:
+        """get_operation_schema raises ToolError for unknown operation."""
+        tool = server_with_tools._tool_manager._tools["get_operation_schema"]
+        with pytest.raises(ToolError, match=r"Operation 'nonExistentOp' not found"):
+            await tool.fn(operation_id="nonExistentOp")  # ty: ignore[unresolved-attribute]
+
+    @pytest.mark.anyio
+    async def test_call_api_unknown_operation_raises_tool_error(self, server_with_tools: FastMCP) -> None:
+        """call_api raises ToolError for unknown operation."""
+        tool = server_with_tools._tool_manager._tools["call_api"]
+        with pytest.raises(ToolError, match=r"Operation 'nonExistentOp' not found"):
+            await tool.fn(operation_id="nonExistentOp")  # ty: ignore[unresolved-attribute]
+
+    @pytest.mark.anyio
+    async def test_call_api_missing_path_params_raises_tool_error(self, server_with_tools: FastMCP) -> None:
+        """call_api raises ToolError when required path params are missing."""
+        tool = server_with_tools._tool_manager._tools["call_api"]
+        # accountsDelete requires accountId path param
+        with pytest.raises(ToolError, match=r"Missing required path parameters"):
+            await tool.fn(operation_id="accountsDelete", path_params=None)  # ty: ignore[unresolved-attribute]
+
+    @pytest.mark.anyio
+    async def test_call_api_request_error_raises_tool_error(self, server_with_tools: FastMCP) -> None:
+        """call_api raises ToolError on httpx.RequestError."""
+        tool = server_with_tools._tool_manager._tools["call_api"]
+
+        # Mock the httpx client to raise a connection error
+        # accountsCreate has no path params, so it will reach the HTTP request
+        with (
+            patch.object(
+                httpx.AsyncClient,
+                "request",
+                side_effect=httpx.ConnectError("Connection refused"),
+            ),
+            pytest.raises(ToolError, match=r"API request failed"),
+        ):
+            await tool.fn(operation_id="accountsCreate")  # ty: ignore[unresolved-attribute]
