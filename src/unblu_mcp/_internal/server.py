@@ -321,7 +321,7 @@ Example workflow:
     )
 
     # Configure file-based logging with daily rotation
-    # Logs are written to ~/.unblu-mcp/logs/unblu-mcp-YYYY-MM-DD.log
+    # Logs are written to ~/.unblu-mcp/logs/unblu-mcp.log (rotated files: unblu-mcp.log.YYYY-MM-DD)
     # Can be customized via UNBLU_MCP_LOG_DIR env var or disabled with UNBLU_MCP_LOG_DISABLE=1
     _configure_file_logging()
 
