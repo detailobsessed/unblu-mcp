@@ -1,0 +1,8 @@
+[tool.bandit]
+exclude_dirs = ["tests", "scripts"]
+skips = [
+    "B101",  # assert_used - common in tests
+    "B404",  # import_subprocess - needed for kubectl port-forward
+    "B603",  # subprocess_without_shell_equals_true - kubectl with controlled args
+    "B607",  # start_process_with_partial_path - kubectl found via shutil.which
+]
