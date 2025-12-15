@@ -54,7 +54,7 @@ def _load_environments_from_yaml(path: Path) -> dict[str, K8sEnvironmentConfig]:
     if not path.exists():
         return {}
 
-    with path.open() as f:
+    with path.open(encoding="utf-8") as f:
         data: dict[str, Any] = yaml.safe_load(f) or {}
 
     environments: dict[str, K8sEnvironmentConfig] = {}
