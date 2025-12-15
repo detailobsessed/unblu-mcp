@@ -1,7 +1,7 @@
 # unblu-mcp
 
-[![ci](https://github.com/ichoosetoaccept/unblu-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/ichoosetoaccept/unblu-mcp/actions/workflows/ci.yml)
-[![documentation](https://img.shields.io/badge/docs-mkdocs-708FCC.svg?style=flat)](https://ichoosetoaccept.github.io/unblu-mcp/)
+[![ci](https://github.com/detailobsessed/unblu-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/detailobsessed/unblu-mcp/actions/workflows/ci.yml)
+[![documentation](https://img.shields.io/badge/docs-mkdocs-708FCC.svg?style=flat)](https://detailobsessed.github.io/unblu-mcp/)
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for interacting with [Unblu](https://www.unblu.com/) deployments. This server provides AI assistants with token-efficient access to 300+ Unblu API endpoints through progressive disclosure.
 
@@ -31,7 +31,7 @@ Built with [FastMCP 2.14+](https://github.com/jlowin/fastmcp), leveraging cuttin
 ### From source (recommended)
 
 ```bash
-git clone https://github.com/ichoosetoaccept/unblu-mcp.git
+git clone https://github.com/detailobsessed/unblu-mcp.git
 cd unblu-mcp
 uv sync
 ```
@@ -253,11 +253,78 @@ eunomia-mcp validate mcp_policies.json
 
 See the [Eunomia documentation](https://github.com/whataboutyou-ai/eunomia) for advanced policy configuration.
 
+## Programmatic Usage
+
+### Connection Providers
+
+The server supports pluggable connection providers for different deployment scenarios:
+
+```python
+from unblu_mcp import create_server, DefaultConnectionProvider
+
+# Default provider (uses environment variables)
+server = create_server()
+
+# Custom provider with explicit credentials
+provider = DefaultConnectionProvider(
+    base_url="https://my-instance.unblu.cloud/app/rest/v4",
+    api_key="my-api-key",
+)
+server = create_server(provider=provider)
+```
+
+#### Kubernetes Port-Forward Provider
+
+For Kubernetes deployments, use the built-in K8s provider:
+
+```python
+from unblu_mcp import create_server, K8sConnectionProvider
+
+# Connect to a K8s environment (starts kubectl port-forward automatically)
+provider = K8sConnectionProvider(environment="t1")
+server = create_server(provider=provider)
+```
+
+K8s environments are configured in `~/.unblu-mcp/k8s_environments.yaml`:
+
+```yaml
+environments:
+  t1:
+    local_port: 8084
+    namespace: unblu-t1
+    service: haproxy
+    service_port: 8080
+    api_path: /kop/rest/v4
+```
+
+#### Custom Connection Providers
+
+Implement the `ConnectionProvider` interface for custom connectivity:
+
+```python
+from unblu_mcp import ConnectionProvider, ConnectionConfig
+
+class MyProvider(ConnectionProvider):
+    async def setup(self) -> None:
+        # Initialize connection (e.g., start tunnel)
+        pass
+
+    async def teardown(self) -> None:
+        # Clean up resources
+        pass
+
+    def get_config(self) -> ConnectionConfig:
+        return ConnectionConfig(
+            base_url="https://api.example.com",
+            headers={"X-Custom-Header": "value"},
+        )
+```
+
 ## Development
 
 ```bash
 # Clone the repository
-git clone https://github.com/ichoosetoaccept/unblu-mcp.git
+git clone https://github.com/detailobsessed/unblu-mcp.git
 cd unblu-mcp
 
 # Install dependencies

@@ -34,14 +34,14 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://ichoosetoaccept.github.io/unblu-mcp"
-Documentation = "https://ichoosetoaccept.github.io/unblu-mcp"
-Changelog = "https://ichoosetoaccept.github.io/unblu-mcp/changelog"
-Repository = "https://github.com/ichoosetoaccept/unblu-mcp"
-Issues = "https://github.com/ichoosetoaccept/unblu-mcp/issues"
-Discussions = "https://github.com/ichoosetoaccept/unblu-mcp/discussions"
+Homepage = "https://detailobsessed.github.io/unblu-mcp"
+Documentation = "https://detailobsessed.github.io/unblu-mcp"
+Changelog = "https://detailobsessed.github.io/unblu-mcp/changelog"
+Repository = "https://github.com/detailobsessed/unblu-mcp"
+Issues = "https://github.com/detailobsessed/unblu-mcp/issues"
+Discussions = "https://github.com/detailobsessed/unblu-mcp/discussions"
 Gitter = "https://gitter.im/unblu-mcp/community"
-Funding = "https://github.com/sponsors/ichoosetoaccept"
+Funding = "https://github.com/sponsors/detailobsessed"
 
 [project.scripts]
 unblu-mcp = "unblu_mcp._internal.cli:main"

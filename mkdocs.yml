@@ -1,8 +1,8 @@
 site_name: "unblu-mcp"
 site_description: "A model context protocol server for interacting with Unblu deployments."
-site_url: "https://ichoosetoaccept.github.io/unblu-mcp"
-repo_url: "https://github.com/ichoosetoaccept/unblu-mcp"
-repo_name: "ichoosetoaccept/unblu-mcp"
+site_url: "https://detailobsessed.github.io/unblu-mcp"
+repo_url: "https://github.com/detailobsessed/unblu-mcp"
+repo_name: "detailobsessed/unblu-mcp"
 site_dir: "site"
 watch: [mkdocs.yml, README.md, CONTRIBUTING.md, CHANGELOG.md, src/unblu_mcp]
 copyright: Copyright &copy; 2025 Ismar Iljazovic
@@ -143,7 +143,7 @@ plugins:
 extra:
   social:
   - icon: fontawesome/brands/github
-    link: https://github.com/ichoosetoaccept
+    link: https://github.com/detailobsessed
   - icon: fontawesome/brands/gitter
     link: https://gitter.im/unblu-mcp/community
   - icon: fontawesome/brands/python
