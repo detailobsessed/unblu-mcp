@@ -119,6 +119,9 @@ jobs:
           resolution: lowest-direct
         - os: windows
           resolution: lowest-direct
+        # Python 3.14 + lowest-direct fails because pydantic-core doesn't have pre-built wheels
+        - python-version: "3.14"
+          resolution: lowest-direct
     runs-on: ${{ matrix.runner }}
     continue-on-error: true
 
