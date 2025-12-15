@@ -37,6 +37,13 @@ repos:
         types: [python]
         pass_filenames: false
 
+      - id: check-lfs-files
+        name: check LFS files are not pointers
+        entry: bash scripts/check_lfs_files.sh
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
       - id: docs-build
         name: docs build check
         entry: bash -c 'mkdir -p htmlcov && echo "<html><body>No coverage report yet</body></html>" > htmlcov/index.html && uv run poe docs-build'
