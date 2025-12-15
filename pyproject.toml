@@ -10,7 +10,7 @@ license = "ISC"
 license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.13"
-keywords = []
+keywords = ["mcp", "model-context-protocol", "unblu", "api", "llm", "ai", "chatbot", "customer-service"]
 version = "0.1.0"
 classifiers = [
     "Development Status :: 4 - Beta",
