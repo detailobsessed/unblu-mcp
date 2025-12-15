@@ -220,6 +220,7 @@ Logs include:
 - Log level
 - Tool name and arguments
 - Response summaries
+- **Request duration** (`duration_ms`) for performance analysis
 
 Logs are retained for 30 days and automatically rotated at midnight UTC.
 
