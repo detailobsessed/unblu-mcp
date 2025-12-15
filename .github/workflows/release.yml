@@ -8,11 +8,14 @@ name: release
 
 permissions:
   contents: write
+  id-token: write  # Required for PyPI trusted publishing
 
 jobs:
   release:
     runs-on: blacksmith-4vcpu-ubuntu-2404
     concurrency: release
+    environment:
+      name: pypi  # Must match PyPI trusted publisher config
 
     steps:
     - name: Checkout
@@ -31,16 +34,28 @@ jobs:
       run: uv sync --group maintain
 
     - name: Semantic Release
+      id: release
       env:
         GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-      run: uv run semantic-release version --changelog --push --tag --vcs-release
+      run: |
+        output=$(uv run semantic-release version --changelog --push --tag --vcs-release 2>&1) || true
+        echo "$output"
+        if echo "$output" | grep -q "No release will be made"; then
+          echo "released=false" >> "$GITHUB_OUTPUT"
+        else
+          echo "released=true" >> "$GITHUB_OUTPUT"
+        fi
 
-    # Uncomment to publish to PyPI:
-    # - name: Publish to PyPI
-    #   if: secrets.PYPI_TOKEN != ''
-    #   env:
-    #     PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-    #   run: |
-    #     if [ -n "$PYPI_TOKEN" ]; then
-    #       uv publish --token $PYPI_TOKEN
-    #     fi
+    - name: Build package
+      if: steps.release.outputs.released == 'true'
+      run: uv build
+
+    # Uses PyPI trusted publishing - no token needed
+    # Setup: https://docs.pypi.org/trusted-publishers/adding-a-publisher/
+    - name: Publish to TestPyPI
+      if: steps.release.outputs.released == 'true' && vars.PYPI_PUBLISH == 'test'
+      run: uv publish --publish-url https://test.pypi.org/legacy/
+
+    - name: Publish to PyPI
+      if: steps.release.outputs.released == 'true' && vars.PYPI_PUBLISH == 'true'
+      run: uv publish
