@@ -9,11 +9,19 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 
 from unblu_mcp._internal.providers_k8s import (
-    DEFAULT_ENVIRONMENTS,
     K8sConnectionProvider,
     K8sEnvironmentConfig,
+    _get_default_environments,
     detect_environment_from_context,
 )
+
+# Test environments for use in tests
+TEST_ENVIRONMENTS = {
+    "dev": K8sEnvironmentConfig(name="dev", local_port=8084, namespace="unblu-dev"),
+    "test1": K8sEnvironmentConfig(name="test1", local_port=8085, namespace="unblu-test1"),
+    "test2": K8sEnvironmentConfig(name="test2", local_port=8087, namespace="unblu-test2"),
+    "prod": K8sEnvironmentConfig(name="prod", local_port=8086, namespace="unblu-prod"),
+}
 
 
 class TestK8sEnvironmentConfig:
@@ -44,27 +52,29 @@ class TestK8sEnvironmentConfig:
         assert config.api_path == "/api/v1"
 
 
-class TestDefaultEnvironments:
-    """Tests for default environment configurations."""
+class TestGetDefaultEnvironments:
+    """Tests for environment loading from config files."""
 
-    def test_all_environments_defined(self) -> None:
-        """All expected environments are defined."""
-        assert "t1" in DEFAULT_ENVIRONMENTS
-        assert "t2" in DEFAULT_ENVIRONMENTS
-        assert "p1" in DEFAULT_ENVIRONMENTS
-        assert "e1" in DEFAULT_ENVIRONMENTS
+    def test_loads_environments_from_example_config(self) -> None:
+        """Loads environments from example config when user config doesn't exist."""
+        environments = _get_default_environments()
+        # Should load from k8s_environments.example.yaml
+        assert len(environments) > 0
 
     def test_environments_have_unique_ports(self) -> None:
         """Each environment has a unique local port."""
-        ports = [env.local_port for env in DEFAULT_ENVIRONMENTS.values()]
-        assert len(ports) == len(set(ports))
+        environments = _get_default_environments()
+        if environments:  # Only test if environments are loaded
+            ports = [env.local_port for env in environments.values()]
+            assert len(ports) == len(set(ports))
 
-    def test_t1_config(self) -> None:
-        """T1 environment has correct configuration."""
-        t1 = DEFAULT_ENVIRONMENTS["t1"]
-        assert t1.name == "t1"
-        assert t1.local_port == 8084
-        assert t1.namespace == "appl-kop-t1"
+    def test_environment_configs_are_valid(self) -> None:
+        """All loaded environments have required fields."""
+        environments = _get_default_environments()
+        for name, config in environments.items():
+            assert config.name == name
+            assert config.local_port > 0
+            assert config.namespace
 
 
 class TestK8sConnectionProvider:
@@ -72,8 +82,8 @@ class TestK8sConnectionProvider:
 
     def test_init_with_string_environment(self) -> None:
         """Provider initializes with string environment name."""
-        provider = K8sConnectionProvider(environment="t1")
-        assert provider.environment == "t1"
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
+        assert provider.environment == "dev"
         assert provider.local_port == 8084
 
     def test_init_with_config_object(self) -> None:
@@ -86,7 +96,7 @@ class TestK8sConnectionProvider:
     def test_init_unknown_environment_raises(self) -> None:
         """Provider raises ValueError for unknown environment."""
         with pytest.raises(ValueError, match="Unknown environment 'invalid'"):
-            K8sConnectionProvider(environment="invalid")
+            K8sConnectionProvider(environment="invalid", environments=TEST_ENVIRONMENTS)
 
     def test_init_custom_environments(self) -> None:
         """Provider accepts custom environment configurations."""
@@ -100,9 +110,10 @@ class TestK8sConnectionProvider:
     def test_get_config_returns_connection_config(self) -> None:
         """get_config returns properly configured ConnectionConfig."""
         provider = K8sConnectionProvider(
-            environment="t1",
+            environment="dev",
             trusted_user_id="testuser",
             trusted_user_role="ADMIN",
+            environments=TEST_ENVIRONMENTS,
         )
         config = provider.get_config()
 
@@ -112,7 +123,7 @@ class TestK8sConnectionProvider:
 
     def test_get_config_default_trusted_headers(self) -> None:
         """get_config uses default trusted headers."""
-        provider = K8sConnectionProvider(environment="t1")
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
         config = provider.get_config()
 
         assert config.headers["x-unblu-trusted-user-id"] == "superadmin"
@@ -121,7 +132,7 @@ class TestK8sConnectionProvider:
     @pytest.mark.asyncio
     async def test_setup_port_already_in_use(self) -> None:
         """setup() returns early if port is already in use."""
-        provider = K8sConnectionProvider(environment="t1")
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
 
         with patch.object(provider, "_is_port_in_use", return_value=True):
             await provider.setup()
@@ -131,7 +142,7 @@ class TestK8sConnectionProvider:
     @pytest.mark.asyncio
     async def test_setup_kubectl_not_found(self) -> None:
         """setup() raises RuntimeError if kubectl not found."""
-        provider = K8sConnectionProvider(environment="t1")
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
 
         with (
             patch.object(provider, "_is_port_in_use", return_value=False),
@@ -143,7 +154,7 @@ class TestK8sConnectionProvider:
     @pytest.mark.asyncio
     async def test_setup_starts_port_forward(self) -> None:
         """setup() starts kubectl port-forward process."""
-        provider = K8sConnectionProvider(environment="t1")
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
         mock_process = MagicMock()
 
         # First call returns False (port not in use), subsequent calls return True (port ready)
@@ -161,12 +172,12 @@ class TestK8sConnectionProvider:
             assert "kubectl" in call_args
             assert "port-forward" in call_args
             assert "-n" in call_args
-            assert "appl-kop-t1" in call_args
+            assert "unblu-dev" in call_args
 
     @pytest.mark.asyncio
     async def test_setup_timeout_kills_process(self) -> None:
         """setup() kills process and raises if port never becomes available."""
-        provider = K8sConnectionProvider(environment="t1")
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
         mock_process = MagicMock()
 
         with (
@@ -183,7 +194,7 @@ class TestK8sConnectionProvider:
     @pytest.mark.asyncio
     async def test_teardown_terminates_process(self) -> None:
         """teardown() terminates the port-forward process."""
-        provider = K8sConnectionProvider(environment="t1")
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
         mock_process = MagicMock()
         provider._port_forward_process = mock_process
 
@@ -196,7 +207,7 @@ class TestK8sConnectionProvider:
     @pytest.mark.asyncio
     async def test_teardown_kills_on_timeout(self) -> None:
         """teardown() kills process if terminate times out."""
-        provider = K8sConnectionProvider(environment="t1")
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
         mock_process = MagicMock()
         mock_process.wait.side_effect = subprocess.TimeoutExpired(cmd="kubectl", timeout=5)
         provider._port_forward_process = mock_process
@@ -210,7 +221,7 @@ class TestK8sConnectionProvider:
     @pytest.mark.asyncio
     async def test_teardown_no_process(self) -> None:
         """teardown() does nothing if no process was started."""
-        provider = K8sConnectionProvider(environment="t1")
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
         provider._port_forward_process = None
 
         await provider.teardown()  # Should not raise
@@ -218,7 +229,7 @@ class TestK8sConnectionProvider:
     @pytest.mark.asyncio
     async def test_health_check_delegates_to_port_check(self) -> None:
         """health_check() returns port availability status."""
-        provider = K8sConnectionProvider(environment="t1")
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
 
         with patch.object(provider, "_is_port_in_use", return_value=True):
             assert await provider.health_check() is True
@@ -228,14 +239,14 @@ class TestK8sConnectionProvider:
 
     def test_is_port_in_use_available_port(self) -> None:
         """_is_port_in_use returns False for available port."""
-        provider = K8sConnectionProvider(environment="t1")
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
         # Use a high port that's unlikely to be in use
         provider._env_config = K8sEnvironmentConfig(name="test", local_port=59999, namespace="test")
         assert provider._is_port_in_use() is False
 
     def test_is_port_in_use_bound_port(self) -> None:
         """_is_port_in_use returns True for bound port."""
-        provider = K8sConnectionProvider(environment="t1")
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
 
         # Bind a port temporarily
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
@@ -250,28 +261,52 @@ class TestK8sConnectionProvider:
 class TestDetectEnvironmentFromContext:
     """Tests for detect_environment_from_context function."""
 
-    def test_detects_t1_environment(self) -> None:
-        """Detects t1 from context name."""
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout="cluster-t1-context\n")
-            assert detect_environment_from_context() == "t1"
+    def test_detects_dev_environment(self) -> None:
+        """Detects dev from context name."""
+        with (
+            patch("subprocess.run") as mock_run,
+            patch(
+                "unblu_mcp._internal.providers_k8s._get_default_environments",
+                return_value=TEST_ENVIRONMENTS,
+            ),
+        ):
+            mock_run.return_value = MagicMock(stdout="cluster-dev-context\n")
+            assert detect_environment_from_context() == "dev"
 
     def test_detects_environment_with_suffix(self) -> None:
         """Detects environment from context ending with env name."""
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout="my-cluster-p1\n")
-            assert detect_environment_from_context() == "p1"
+        with (
+            patch("subprocess.run") as mock_run,
+            patch(
+                "unblu_mcp._internal.providers_k8s._get_default_environments",
+                return_value=TEST_ENVIRONMENTS,
+            ),
+        ):
+            mock_run.return_value = MagicMock(stdout="my-cluster-prod\n")
+            assert detect_environment_from_context() == "prod"
 
     def test_detects_environment_with_dash_pattern(self) -> None:
         """Detects environment from -env- pattern in context."""
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout="prefix-e1-suffix\n")
-            assert detect_environment_from_context() == "e1"
+        with (
+            patch("subprocess.run") as mock_run,
+            patch(
+                "unblu_mcp._internal.providers_k8s._get_default_environments",
+                return_value=TEST_ENVIRONMENTS,
+            ),
+        ):
+            mock_run.return_value = MagicMock(stdout="prefix-test1-suffix\n")
+            assert detect_environment_from_context() == "test1"
 
     def test_returns_none_for_unknown_context(self) -> None:
         """Returns None if context doesn't match any environment."""
-        with patch("subprocess.run") as mock_run:
-            mock_run.return_value = MagicMock(stdout="production-cluster\n")
+        with (
+            patch("subprocess.run") as mock_run,
+            patch(
+                "unblu_mcp._internal.providers_k8s._get_default_environments",
+                return_value=TEST_ENVIRONMENTS,
+            ),
+        ):
+            mock_run.return_value = MagicMock(stdout="unknown-cluster\n")
             assert detect_environment_from_context() is None
 
     def test_returns_none_on_subprocess_error(self) -> None:

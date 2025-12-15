@@ -17,6 +17,9 @@
 /site/
 uv.lock
 
+# local config (user-specific, may contain sensitive data)
+config/k8s_environments.yaml
+
 # cache
 .cache/
 .pytest_cache/

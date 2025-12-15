@@ -40,12 +40,21 @@ class TestConfigureFileLogging:
     def test_adds_handler_to_fastmcp_logger(self, tmp_path: Path) -> None:
         """A TimedRotatingFileHandler is added to the fastmcp logger."""
         logger = logging.getLogger("fastmcp")
-        initial_handlers = len(logger.handlers)
+        # Count only TimedRotatingFileHandler instances pointing to tmp_path
+        initial_count = sum(
+            1
+            for h in logger.handlers
+            if isinstance(h, TimedRotatingFileHandler) and str(tmp_path) in str(h.baseFilename)
+        )
 
         _configure_file_logging(log_dir=tmp_path)
 
-        assert len(logger.handlers) > initial_handlers
-        assert any(isinstance(h, TimedRotatingFileHandler) for h in logger.handlers)
+        new_count = sum(
+            1
+            for h in logger.handlers
+            if isinstance(h, TimedRotatingFileHandler) and str(tmp_path) in str(h.baseFilename)
+        )
+        assert new_count > initial_count
 
     def test_does_not_add_duplicate_handlers(self, tmp_path: Path) -> None:
         """Calling configure twice doesn't add duplicate handlers."""

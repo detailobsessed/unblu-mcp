@@ -5,6 +5,11 @@ import shutil
 import socket
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from typing import Any
 
 from unblu_mcp._internal.providers import ConnectionConfig, ConnectionProvider
 
@@ -14,7 +19,7 @@ class K8sEnvironmentConfig:
     """Configuration for a Kubernetes environment."""
 
     name: str
-    """Environment name (e.g., t1, t2, p1, e1)."""
+    """Environment name (e.g., dev, staging, prod)."""
 
     local_port: int
     """Local port for port-forwarding."""
@@ -32,13 +37,46 @@ class K8sEnvironmentConfig:
     """API path prefix."""
 
 
-# Default environment configurations
-DEFAULT_ENVIRONMENTS: dict[str, K8sEnvironmentConfig] = {
-    "t1": K8sEnvironmentConfig(name="t1", local_port=8084, namespace="appl-kop-t1"),
-    "t2": K8sEnvironmentConfig(name="t2", local_port=8085, namespace="appl-kop-t2"),
-    "p1": K8sEnvironmentConfig(name="p1", local_port=8086, namespace="appl-kop-p1"),
-    "e1": K8sEnvironmentConfig(name="e1", local_port=8087, namespace="appl-kop-e1"),
-}
+# Config file paths (relative to project root)
+_CONFIG_DIR = Path(__file__).parent.parent.parent.parent / "config"
+_USER_CONFIG = _CONFIG_DIR / "k8s_environments.yaml"
+_EXAMPLE_CONFIG = _CONFIG_DIR / "k8s_environments.example.yaml"
+
+
+def _load_environments_from_yaml(path: Path) -> dict[str, K8sEnvironmentConfig]:
+    """Load environment configurations from a YAML file."""
+    try:
+        import yaml  # noqa: PLC0415
+    except ImportError as e:
+        msg = "PyYAML is required for K8s environments. Install with: pip install pyyaml"
+        raise ImportError(msg) from e
+
+    if not path.exists():
+        return {}
+
+    with path.open() as f:
+        data: dict[str, Any] = yaml.safe_load(f) or {}
+
+    environments: dict[str, K8sEnvironmentConfig] = {}
+    for name, config in data.get("environments", {}).items():
+        environments[name] = K8sEnvironmentConfig(
+            name=name,
+            local_port=config["local_port"],
+            namespace=config["namespace"],
+            service=config.get("service", "haproxy"),
+            service_port=config.get("service_port", 8080),
+            api_path=config.get("api_path", "/kop/rest/v4"),
+        )
+    return environments
+
+
+def _get_default_environments() -> dict[str, K8sEnvironmentConfig]:
+    """Get environment configurations from user config or example file."""
+    # Try user config first (gitignored, may contain sensitive data)
+    if _USER_CONFIG.exists():
+        return _load_environments_from_yaml(_USER_CONFIG)
+    # Fall back to example config
+    return _load_environments_from_yaml(_EXAMPLE_CONFIG)
 
 
 class K8sConnectionProvider(ConnectionProvider):
@@ -51,13 +89,13 @@ class K8sConnectionProvider(ConnectionProvider):
     - Supports multiple environments with different ports
 
     Args:
-        environment: Environment name (t1, t2, p1, e1) or custom K8sEnvironmentConfig.
+        environment: Environment name (dev, staging, prod) or custom K8sEnvironmentConfig.
         trusted_user_id: User ID for trusted headers auth (default: superadmin).
         trusted_user_role: User role for trusted headers auth (default: SUPER_ADMIN).
         environments: Custom environment configurations (overrides defaults).
 
     Example:
-        provider = K8sConnectionProvider(environment="t1")
+        provider = K8sConnectionProvider(environment="dev")
         await provider.setup()  # Starts port-forward
         config = provider.get_config()  # Returns connection config
         await provider.teardown()  # Stops port-forward
@@ -65,12 +103,12 @@ class K8sConnectionProvider(ConnectionProvider):
 
     def __init__(
         self,
-        environment: str | K8sEnvironmentConfig = "t1",
+        environment: str | K8sEnvironmentConfig = "dev",
         trusted_user_id: str = "superadmin",
         trusted_user_role: str = "SUPER_ADMIN",
         environments: dict[str, K8sEnvironmentConfig] | None = None,
     ) -> None:
-        self._environments = environments or DEFAULT_ENVIRONMENTS
+        self._environments = environments or _get_default_environments()
 
         if isinstance(environment, str):
             if environment not in self._environments:
@@ -165,8 +203,11 @@ class K8sConnectionProvider(ConnectionProvider):
 def detect_environment_from_context() -> str | None:
     """Detect the environment from the current kubectl context.
 
+    Matches environment names from the loaded configuration against
+    patterns in the current kubectl context name.
+
     Returns:
-        Environment name (t1, t2, p1, e1) or None if not detected.
+        Environment name or None if not detected.
     """
     try:
         result = subprocess.run(
@@ -177,8 +218,9 @@ def detect_environment_from_context() -> str | None:
         )
         context = result.stdout.strip()
 
-        # Match common patterns
-        for env in ["t1", "t2", "p1", "e1"]:
+        # Match against configured environment names
+        environments = _get_default_environments()
+        for env in environments:
             if f"-{env}-" in context or context.endswith(f"-{env}"):
                 return env
         return None  # noqa: TRY300

@@ -1,0 +1,42 @@
+# Kubernetes environment configurations for unblu-mcp
+# Copy this file to k8s_environments.yaml and customize for your deployment
+#
+# Usage:
+#   cp config/k8s_environments.example.yaml config/k8s_environments.yaml
+#   # Edit k8s_environments.yaml with your actual namespace names
+#
+# The K8sConnectionProvider will load from k8s_environments.yaml if it exists,
+# otherwise it will use these example values.
+
+environments:
+  # Development environment
+  dev:
+    local_port: 8084
+    namespace: unblu-dev
+    service: haproxy
+    service_port: 8080
+    api_path: /kop/rest/v4
+
+  # Test environment 1
+  test1:
+    local_port: 8085
+    namespace: unblu-test1
+    service: haproxy
+    service_port: 8080
+    api_path: /kop/rest/v4
+
+  # Test environment 2
+  test2:
+    local_port: 8087
+    namespace: unblu-test2
+    service: haproxy
+    service_port: 8080
+    api_path: /kop/rest/v4
+
+  # Production environment
+  prod:
+    local_port: 8086
+    namespace: unblu-prod
+    service: haproxy
+    service_port: 8080
+    api_path: /kop/rest/v4

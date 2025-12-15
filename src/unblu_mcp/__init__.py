@@ -14,7 +14,6 @@ from unblu_mcp._internal.providers import (
     DefaultConnectionProvider,
 )
 from unblu_mcp._internal.providers_k8s import (
-    DEFAULT_ENVIRONMENTS,
     K8sConnectionProvider,
     K8sEnvironmentConfig,
     detect_environment_from_context,
@@ -29,7 +28,6 @@ from unblu_mcp._internal.server import (
 )
 
 __all__: list[str] = [
-    "DEFAULT_ENVIRONMENTS",
     "ConnectionConfig",
     "ConnectionProvider",
     "DefaultConnectionProvider",
