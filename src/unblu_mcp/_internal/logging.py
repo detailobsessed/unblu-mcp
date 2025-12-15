@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import UTC, datetime
 from logging.handlers import TimedRotatingFileHandler
 from pathlib import Path
 
@@ -14,8 +13,9 @@ _LOG_RETENTION_DAYS = 30
 def _configure_file_logging(log_dir: Path | str | None = None) -> Path | None:
     """Configure file-based logging with daily rotation.
 
-    Creates a log file with format: unblu-mcp-YYYY-MM-DD.log
-    Rotates daily at midnight and keeps LOG_RETENTION_DAYS days of logs.
+    Creates unblu-mcp.log which rotates daily at midnight.
+    Rotated files are named unblu-mcp.log.YYYY-MM-DD.
+    Keeps LOG_RETENTION_DAYS days of logs.
 
     Args:
         log_dir: Directory for log files. Defaults to UNBLU_MCP_LOG_DIR env var
@@ -37,9 +37,8 @@ def _configure_file_logging(log_dir: Path | str | None = None) -> Path | None:
     log_dir = Path(log_dir)
     log_dir.mkdir(parents=True, exist_ok=True)
 
-    # Create log filename with today's date
-    today = datetime.now(UTC).strftime("%Y-%m-%d")
-    log_file = log_dir / f"unblu-mcp-{today}.log"
+    # Static filename - TimedRotatingFileHandler manages rotation
+    log_file = log_dir / "unblu-mcp.log"
 
     # Configure the root logger for fastmcp
     logger = logging.getLogger("fastmcp")

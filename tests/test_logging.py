@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import logging
 import os
-from datetime import UTC, datetime
 from logging.handlers import TimedRotatingFileHandler
 from typing import TYPE_CHECKING
 from unittest.mock import patch
@@ -29,13 +28,12 @@ class TestConfigureFileLogging:
         assert result is not None
         assert result.parent == log_dir
 
-    def test_log_file_has_date_format(self, tmp_path: Path) -> None:
-        """Log file name includes today's date in YYYY-MM-DD format."""
+    def test_log_file_name(self, tmp_path: Path) -> None:
+        """Log file has static name (handler manages rotation suffixes)."""
         result = _configure_file_logging(log_dir=tmp_path)
 
-        today = datetime.now(UTC).strftime("%Y-%m-%d")
         assert result is not None
-        assert result.name == f"unblu-mcp-{today}.log"
+        assert result.name == "unblu-mcp.log"
 
     def test_adds_handler_to_fastmcp_logger(self, tmp_path: Path) -> None:
         """A TimedRotatingFileHandler is added to the fastmcp logger."""

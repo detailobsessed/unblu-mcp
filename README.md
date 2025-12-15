@@ -175,8 +175,9 @@ Logs are written to `~/.unblu-mcp/logs/` with daily rotation:
 
 ```
 ~/.unblu-mcp/logs/
-├── unblu-mcp-2025-01-15.log
-├── unblu-mcp-2025-01-14.log
+├── unblu-mcp.log              # Current log
+├── unblu-mcp.log.2025-01-14   # Yesterday
+├── unblu-mcp.log.2025-01-13   # Day before
 └── ...
 ```
 
