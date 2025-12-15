@@ -1,0 +1,157 @@
+[build-system]
+requires = ["uv_build"]
+build-backend = "uv_build"
+
+[project]
+name = "unblu-mcp"
+description = "A model context protocol server for interacting with Unblu deployments."
+authors = [{name = "Ismar Iljazovic", email = "ismar@gmail.com"}]
+license = "ISC"
+license-files = ["LICENSE"]
+readme = "README.md"
+requires-python = ">=3.13"
+keywords = []
+version = "0.1.0"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
+    "Programming Language :: Python :: 3.15",
+    "Topic :: Documentation",
+    "Topic :: Software Development",
+    "Topic :: Utilities",
+    "Typing :: Typed",
+]
+dependencies = [
+    "fastmcp>=2.14.0",
+    "httpx>=0.27.0",
+    "pydantic>=2.0.0",
+    "prek",
+]
+
+[project.urls]
+Homepage = "https://ichoosetoaccept.github.io/unblu-mcp"
+Documentation = "https://ichoosetoaccept.github.io/unblu-mcp"
+Changelog = "https://ichoosetoaccept.github.io/unblu-mcp/changelog"
+Repository = "https://github.com/ichoosetoaccept/unblu-mcp"
+Issues = "https://github.com/ichoosetoaccept/unblu-mcp/issues"
+Discussions = "https://github.com/ichoosetoaccept/unblu-mcp/discussions"
+Gitter = "https://gitter.im/unblu-mcp/community"
+Funding = "https://github.com/sponsors/ichoosetoaccept"
+
+[project.scripts]
+unblu-mcp = "unblu_mcp._internal.cli:main"
+
+[project.optional-dependencies]
+safety = [
+    "eunomia-mcp>=0.3.10",
+]
+
+[dependency-groups]
+maintain = [
+    "build>=1.2",
+    "yore>=0.4",
+    "python-semantic-release>=10",
+]
+ci = [
+    "ruff>=0.11",
+    "pytest>=8",
+    "pytest-asyncio>=0.24",
+    "pytest-cov>=6",
+    "pytest-randomly>=3.15",
+    "pytest-xdist>=3.5",
+    "respx>=0.21",
+    "ty>=0.0.1a20",
+    "poethepoet>=0.32",
+    "bandit>=1.8",
+    "vulture>=2.13",
+    "pyupgrade>=3.19",
+]
+local = [
+    "prek>=0.2.20",
+]
+docs = [
+    "markdown-callouts>=0.4",
+    "markdown-exec>=1.10",
+    "mkdocs>=1.6",
+    "mkdocs-coverage>=1.1",
+    "mkdocs-git-revision-date-localized-plugin>=1.4",
+    "mkdocs-llmstxt>=0.4",
+    "mkdocs-material>=9.6",
+    "mkdocs-minify-plugin>=0.8",
+    "mkdocs-material-extensions>=1.3",
+    "mkdocs-section-index>=0.3.9",
+    "mkdocstrings[python]>=0.27",
+    # YORE: EOL 3.10: Remove line.
+    "tomli; python_version < '3.11'",
+]
+
+[tool.ty.src]
+exclude = ["scripts/"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[tool.uv]
+default-groups = ["maintain", "ci", "docs", "local"]
+package = true
+
+[tool.poe.tasks]
+# Quality checks
+lint = "ruff check src tests --config config/ruff.toml"
+format = "ruff format src tests --config config/ruff.toml"
+typecheck = "ty check src tests"
+security = "bandit -r src -c config/bandit.toml"
+deadcode = "vulture src tests --min-confidence 80"
+upgrade = "pyupgrade --py313-plus src/**/*.py tests/**/*.py"
+
+# Testing
+test = "pytest tests -c config/pytest.ini"
+test-cov = "pytest tests -c config/pytest.ini --cov=src --cov-report=term-missing --cov-report=html"
+
+# Combined tasks
+check = ["lint", "typecheck", "security", "deadcode"]
+fix = ["format", "upgrade"]
+
+# Run pre-commit hooks
+prek = "prek run --all-files"
+
+# MCP
+inspect = "DANGEROUSLY_OMIT_AUTH=true npx -y @modelcontextprotocol/inspector uv run unblu-mcp"
+
+# Documentation
+docs = "mkdocs serve"
+docs-build = "mkdocs build -s"
+docs-deploy = "mkdocs gh-deploy"
+
+# Setup
+setup = "uv sync --all-extras --dev"
+
+# VSCode configuration
+vscode = "cp -r config/vscode/.vscode ."
+
+# GitHub utilities
+releases = "gh release list --limit 10"
+tags = "sh -c 'git fetch --tags && git tag --sort=-version:refname'"
+runs = "gh run list --limit 10"
+watch = "gh run watch"
+
+[tool.semantic_release]
+version_toml = ["pyproject.toml:project.version"]
+branch = "main"
+build_command = "uv build"
+commit_message = "chore(release): {version}"
+tag_format = "{version}"
+
+[tool.semantic_release.changelog]
+template_dir = "templates"
+changelog_file = "CHANGELOG.md"
+
+[tool.semantic_release.commit_parser_options]
+allowed_tags = ["build", "chore", "ci", "deps", "docs", "feat", "fix", "perf", "refactor", "style", "test"]
+minor_tags = ["feat"]
+patch_tags = ["fix", "perf"]
