@@ -44,13 +44,13 @@ jobs:
         with:
           path: site
 
-#   deploy:
-#     environment:
-#       name: github-pages
-#       url: ${{ steps.deployment.outputs.page_url }}
-#     runs-on: blacksmith-4vcpu-ubuntu-2404
-#     needs: build
-#     steps:
-#       - name: Deploy to GitHub Pages
-#         id: deployment
-#         uses: actions/deploy-pages@v4
+  deploy:
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    needs: build
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
