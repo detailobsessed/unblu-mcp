@@ -49,13 +49,6 @@ def get_parser() -> argparse.ArgumentParser:
         help="Path to swagger.json OpenAPI spec file.",
     )
     parser.add_argument(
-        "--transport",
-        type=str,
-        choices=["stdio", "sse"],
-        default="stdio",
-        help="MCP transport type (default: stdio).",
-    )
-    parser.add_argument(
         "--policy",
         type=str,
         default=None,
@@ -102,7 +95,7 @@ def main(args: list[str] | None = None) -> int:
 
     provider = _get_provider(opts.provider, opts.environment, opts.k8s_config)
     server = _create_server(spec_path=opts.spec, policy_file=opts.policy, provider=provider)
-    server.run(transport=opts.transport)
+    server.run()
     return 0
 
 
