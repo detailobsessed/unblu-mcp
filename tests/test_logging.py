@@ -3,15 +3,12 @@ from __future__ import annotations
 import logging
 import os
 from logging.handlers import TimedRotatingFileHandler
-from typing import TYPE_CHECKING
+from pathlib import Path
 from unittest.mock import patch
 
 import pytest
 
 from unblu_mcp._internal.logging import _configure_file_logging
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 
 class TestConfigureFileLogging:
@@ -39,10 +36,11 @@ class TestConfigureFileLogging:
         """A TimedRotatingFileHandler is added to the fastmcp logger."""
         logger = logging.getLogger("fastmcp")
         # Count only TimedRotatingFileHandler instances pointing to tmp_path
+        # Use Path for comparison to handle Windows/Unix path differences
         initial_count = sum(
             1
             for h in logger.handlers
-            if isinstance(h, TimedRotatingFileHandler) and str(tmp_path) in str(h.baseFilename)
+            if isinstance(h, TimedRotatingFileHandler) and Path(h.baseFilename).parent == tmp_path
         )
 
         _configure_file_logging(log_dir=tmp_path)
@@ -50,7 +48,7 @@ class TestConfigureFileLogging:
         new_count = sum(
             1
             for h in logger.handlers
-            if isinstance(h, TimedRotatingFileHandler) and str(tmp_path) in str(h.baseFilename)
+            if isinstance(h, TimedRotatingFileHandler) and Path(h.baseFilename).parent == tmp_path
         )
         assert new_count > initial_count
 
