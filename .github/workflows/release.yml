@@ -1,9 +1,10 @@
 name: release
 
 "on":
-  push:
-    branches:
-      - main
+  # Disabled auto-release until 0.1.0 tag exists - use workflow_dispatch to trigger manually
+  # push:
+  #   branches:
+  #     - main
   workflow_dispatch:
 
 permissions:
