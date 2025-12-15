@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 from typing import TYPE_CHECKING
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -26,7 +26,7 @@ if TYPE_CHECKING:
 @pytest.fixture(scope="module")
 def swagger_spec() -> dict:
     """Load the swagger.json spec."""
-    spec_path = Path(__file__).parent.parent / "swagger.json"
+    spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
     if not spec_path.exists():
         pytest.skip("swagger.json not found")
     with open(spec_path, encoding="utf-8") as f:
@@ -42,7 +42,7 @@ def registry(swagger_spec: dict) -> UnbluAPIRegistry:
 @pytest.fixture(scope="module")
 def server() -> FastMCP:
     """Create an MCP server instance."""
-    spec_path = Path(__file__).parent.parent / "swagger.json"
+    spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
     return create_server(spec_path=spec_path)
 
 
@@ -282,7 +282,11 @@ class TestCreateServerEdgeCases:
 
     def test_create_server_spec_not_found(self, tmp_path: Path) -> None:
         """create_server raises FileNotFoundError if spec not found."""
+        # Mock importlib.resources to raise FileNotFoundError (simulating missing package resource)
+        mock_files = MagicMock()
+        mock_files.return_value.joinpath.return_value.read_text.side_effect = FileNotFoundError()
         with (
+            patch("unblu_mcp._internal.server.importlib.resources.files", mock_files),
             patch("unblu_mcp._internal.server.Path.cwd", return_value=tmp_path),
             pytest.raises(FileNotFoundError, match=r"swagger\.json not found"),
         ):
@@ -305,7 +309,7 @@ class TestCreateServerEdgeCases:
                     headers={"X-Custom": "header"},
                 )
 
-        spec_path = Path(__file__).parent.parent / "swagger.json"
+        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
         server = create_server(spec_path=spec_path, provider=CustomProvider())
         assert server is not None
 
@@ -328,13 +332,13 @@ class TestEunomiaIntegration:
             )
         )
 
-        spec_path = Path(__file__).parent.parent / "swagger.json"
+        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
         server = create_server(spec_path=spec_path, policy_file=policy_file)
         assert server is not None
 
     def test_create_server_policy_file_not_found(self, tmp_path: Path) -> None:
         """create_server raises FileNotFoundError for missing policy file."""
-        spec_path = Path(__file__).parent.parent / "swagger.json"
+        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
         nonexistent_policy = tmp_path / "nonexistent.json"
 
         with pytest.raises(FileNotFoundError, match=r"Policy file not found"):
@@ -342,7 +346,7 @@ class TestEunomiaIntegration:
 
     def test_create_server_without_policy_file(self) -> None:
         """create_server works without policy_file (default behavior)."""
-        spec_path = Path(__file__).parent.parent / "swagger.json"
+        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
         server = create_server(spec_path=spec_path, policy_file=None)
         assert server is not None
 

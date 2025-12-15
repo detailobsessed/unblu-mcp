@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import importlib.resources
 import json
 import re
 from pathlib import Path
@@ -256,20 +257,26 @@ def create_server(
 
     # Load OpenAPI spec
     if spec_path is None:
-        # Look for swagger.json in common locations
-        candidates = [
-            Path(__file__).parent.parent.parent.parent.parent / "swagger.json",
-            Path.cwd() / "swagger.json",
-        ]
-        for candidate in candidates:
-            if candidate.exists():
-                spec_path = candidate
-                break
-        else:
-            raise FileNotFoundError("swagger.json not found. Please provide spec_path.")
-
-    with open(spec_path, encoding="utf-8") as f:
-        spec = json.load(f)
+        # Try to load from package resources first (works when installed from PyPI)
+        try:
+            spec_file = importlib.resources.files("unblu_mcp").joinpath("swagger.json")
+            spec_content = spec_file.read_text(encoding="utf-8")
+            spec = json.loads(spec_content)
+        except (FileNotFoundError, TypeError):
+            # Fall back to file system for development
+            candidates = [
+                Path.cwd() / "swagger.json",
+            ]
+            for candidate in candidates:
+                if candidate.exists():
+                    with open(candidate, encoding="utf-8") as f:
+                        spec = json.load(f)
+                    break
+            else:
+                raise FileNotFoundError("swagger.json not found. Please provide spec_path.")
+    else:
+        with open(spec_path, encoding="utf-8") as f:
+            spec = json.load(f)
 
     registry = UnbluAPIRegistry(spec)
 

@@ -10,7 +10,7 @@ import pytest
 
 # Load the policy file
 POLICY_PATH = Path(__file__).parent.parent / "config" / "mcp_policies.json"
-SWAGGER_PATH = Path(__file__).parent.parent / "swagger.json"
+SWAGGER_PATH = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
 
 
 @pytest.fixture

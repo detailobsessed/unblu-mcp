@@ -71,7 +71,7 @@ async def mock_mcp_client() -> AsyncIterator[Client[FastMCPTransport]]:
 @pytest.fixture
 async def real_mcp_client() -> AsyncIterator[Client[FastMCPTransport]]:
     """Create MCP client with real swagger.json for integration tests."""
-    spec_path = Path(__file__).parent.parent / "swagger.json"
+    spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
     if not spec_path.exists():
         pytest.skip("swagger.json not found - download it first")
 
@@ -367,7 +367,7 @@ class TestPerformance:
         """Test that server starts quickly with real 2.4MB spec."""
         import time
 
-        spec_path = Path(__file__).parent.parent / "swagger.json"
+        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
         if not spec_path.exists():
             pytest.skip("swagger.json not found")
 
