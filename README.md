@@ -41,7 +41,11 @@ Built with [FastMCP 2.14+](https://github.com/jlowin/fastmcp), leveraging cuttin
 
 ## Installation
 
-### From source (recommended)
+This package is available on [PyPI](https://pypi.org/project/unblu-mcp/) and designed to be run directly via `uvx` - no installation required. See [MCP Client Configuration](#mcp-client-configuration) below.
+
+For development or customization, clone from source:
+
+### From source
 
 ```bash
 git clone https://github.com/detailobsessed/unblu-mcp.git
@@ -51,9 +55,62 @@ uv sync
 
 ## Configuration
 
-### Environment Variables
+### MCP Client Configuration
 
-The server requires the following environment variables:
+Add the server to your MCP client configuration (Claude Desktop, Windsurf, etc.):
+
+#### With Kubernetes Provider (recommended for internal deployments)
+
+The K8s provider automatically manages `kubectl port-forward` connections to your Unblu deployment. This is the most tested configuration.
+
+**macOS** (`~/Library/Application Support/Claude/claude_desktop_config.json` or IDE MCP config):
+
+```json
+{
+  "mcpServers": {
+    "unblu": {
+      "command": "uvx",
+      "args": ["unblu-mcp", "--provider", "k8s", "--environment", "dev"]
+    }
+  }
+}
+```
+
+**Windows** (`%APPDATA%\Claude\claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "unblu": {
+      "command": "uvx",
+      "args": ["unblu-mcp", "--provider", "k8s", "--environment", "dev"]
+    }
+  }
+}
+```
+
+See [K8s Provider Configuration](#kubernetes-provider) below for setting up your environments.
+
+#### With Environment Variables
+
+For direct API access without Kubernetes:
+
+```json
+{
+  "mcpServers": {
+    "unblu": {
+      "command": "uvx",
+      "args": ["unblu-mcp"],
+      "env": {
+        "UNBLU_BASE_URL": "https://your-instance.unblu.cloud/app/rest/v4",
+        "UNBLU_API_KEY": "your-api-key"
+      }
+    }
+  }
+}
+```
+
+### Environment Variables
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -61,68 +118,6 @@ The server requires the following environment variables:
 | `UNBLU_API_KEY` | One of these | API key for authentication (Bearer token) |
 | `UNBLU_USERNAME` | One of these | Username for basic authentication |
 | `UNBLU_PASSWORD` | With username | Password for basic authentication |
-
-### MCP Client Configuration
-
-Add the following to your MCP client configuration:
-
-#### Claude Desktop / Windsurf (macOS)
-
-Edit `~/Library/Application Support/Claude/claude_desktop_config.json` or your IDE's MCP config:
-
-```json
-{
-  "mcpServers": {
-    "unblu": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/unblu-mcp", "unblu-mcp"],
-      "env": {
-        "UNBLU_BASE_URL": "https://your-instance.unblu.cloud/app/rest/v4",
-        "UNBLU_API_KEY": "your-api-key"
-      }
-    }
-  }
-}
-```
-
-> **Note**: Replace `/path/to/unblu-mcp` with the actual path where you cloned the repository.
-
-#### Claude Desktop (Windows)
-
-Edit `%APPDATA%\Claude\claude_desktop_config.json`:
-
-```json
-{
-  "mcpServers": {
-    "unblu": {
-      "command": "uv",
-      "args": ["run", "--directory", "C:\\path\\to\\unblu-mcp", "unblu-mcp"],
-      "env": {
-        "UNBLU_BASE_URL": "https://your-instance.unblu.cloud/app/rest/v4",
-        "UNBLU_API_KEY": "your-api-key"
-      }
-    }
-  }
-}
-```
-
-#### With Basic Authentication
-
-```json
-{
-  "mcpServers": {
-    "unblu": {
-      "command": "uv",
-      "args": ["run", "--directory", "/path/to/unblu-mcp", "unblu-mcp"],
-      "env": {
-        "UNBLU_BASE_URL": "https://your-instance.unblu.cloud/app/rest/v4",
-        "UNBLU_USERNAME": "your-username",
-        "UNBLU_PASSWORD": "your-password"
-      }
-    }
-  }
-}
-```
 
 ## Available Tools
 
@@ -162,9 +157,6 @@ call_api(
 # Run with stdio transport (default, for MCP clients)
 unblu-mcp
 
-# Run with SSE transport (for web-based clients)
-unblu-mcp --transport sse
-
 # Use a custom swagger.json location
 unblu-mcp --spec /path/to/swagger.json
 
@@ -188,7 +180,6 @@ unblu-mcp --debug-info
 
 | Argument | Values | Default | Description |
 |----------|--------|---------|-------------|
-| `--transport` | `stdio`, `sse` | `stdio` | MCP transport type |
 | `--spec` | path | auto-detect | Path to swagger.json |
 | `--policy` | path | none | Eunomia policy file |
 | `--provider` | `default`, `k8s` | `default` | Connection provider |
