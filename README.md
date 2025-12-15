@@ -158,12 +158,29 @@ unblu-mcp --spec /path/to/swagger.json
 # Run with Eunomia authorization policy (requires unblu-mcp[safety])
 unblu-mcp --policy /path/to/mcp_policies.json
 
+# Run with K8s provider (auto-starts kubectl port-forward)
+unblu-mcp --provider k8s --environment dev
+
+# Run with K8s provider using custom config file
+unblu-mcp --provider k8s --environment my-env --k8s-config /path/to/k8s_environments.yaml
+
 # Show version
 unblu-mcp --version
 
 # Show debug info
 unblu-mcp --debug-info
 ```
+
+### CLI Arguments
+
+| Argument | Values | Default | Description |
+|----------|--------|---------|-------------|
+| `--transport` | `stdio`, `sse` | `stdio` | MCP transport type |
+| `--spec` | path | auto-detect | Path to swagger.json |
+| `--policy` | path | none | Eunomia policy file |
+| `--provider` | `default`, `k8s` | `default` | Connection provider |
+| `--environment` | string | `dev` | K8s environment (with `--provider k8s`) |
+| `--k8s-config` | path | none | Custom K8s environments YAML file |
 
 ## Logging & Observability
 
