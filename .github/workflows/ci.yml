@@ -5,9 +5,17 @@ name: ci
     branches:
     - main
     - test-me-*
+    paths-ignore:
+    - "*.md"
+    - "docs/**"
+    - ".github/workflows/docs.yml"
   pull_request:
     branches:
     - main
+    paths-ignore:
+    - "*.md"
+    - "docs/**"
+    - ".github/workflows/docs.yml"
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
