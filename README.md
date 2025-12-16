@@ -2,6 +2,12 @@
 
 [![ci](https://github.com/detailobsessed/unblu-mcp/actions/workflows/ci.yml/badge.svg)](https://github.com/detailobsessed/unblu-mcp/actions/workflows/ci.yml)
 [![documentation](https://img.shields.io/badge/docs-mkdocs-708FCC.svg?style=flat)](https://detailobsessed.github.io/unblu-mcp/)
+[![pypi version](https://img.shields.io/pypi/v/unblu-mcp.svg)](https://pypi.org/project/unblu-mcp/)
+[![python versions](https://img.shields.io/pypi/pyversions/unblu-mcp.svg)](https://pypi.org/project/unblu-mcp/)
+[![license](https://img.shields.io/pypi/l/unblu-mcp.svg)](https://github.com/detailobsessed/unblu-mcp/blob/main/LICENSE)
+[![FastMCP](https://img.shields.io/badge/FastMCP-2.14+-00ADD8.svg)](https://github.com/jlowin/fastmcp)
+[![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/ruff/main/assets/badge/v2.json)](https://github.com/astral-sh/ruff)
+[![uv](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/astral-sh/uv/main/assets/badge/v0.json)](https://github.com/astral-sh/uv)
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for interacting with [Unblu](https://www.unblu.com/) deployments. This server provides AI assistants with token-efficient access to 300+ Unblu API endpoints through progressive disclosure.
 
