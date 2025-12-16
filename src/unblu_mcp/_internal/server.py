@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.resources
 import json
 import re
+from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any
 
@@ -17,6 +18,8 @@ from pydantic import BaseModel, Field
 from unblu_mcp._internal.logging import _configure_file_logging
 
 if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
     from unblu_mcp._internal.providers import ConnectionProvider
 
 # Constants for magic values
@@ -254,7 +257,19 @@ def create_server(
             password=password,
         )
 
+    # Create lifespan context manager to handle provider setup/teardown
+    # This is critical for K8s provider which needs to start port-forward on startup
+    @asynccontextmanager
+    async def lifespan(_mcp: FastMCP) -> AsyncIterator[None]:
+        await provider.setup()
+        try:
+            yield
+        finally:
+            await provider.teardown()
+
     # Get connection config from provider
+    # Note: For K8s provider, the port may not be available yet until setup() is called
+    # but get_config() just returns the expected URL, it doesn't connect
     config = provider.get_config()
 
     # Load OpenAPI spec
@@ -290,9 +305,10 @@ def create_server(
         timeout=config.timeout,
     )
 
-    # Create FastMCP server
+    # Create FastMCP server with lifespan for provider setup/teardown
     mcp = FastMCP(
         name="unblu-mcp",
+        lifespan=lifespan,
         instructions="""Unblu MCP Server - Token-Efficient API Access
 
 This server provides access to 300+ Unblu API endpoints using progressive disclosure
