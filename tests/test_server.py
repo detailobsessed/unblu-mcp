@@ -279,6 +279,116 @@ class TestUnbluAPIRegistryEdgeCases:
         assert "conversation" in results[0].operation_id.lower()
 
 
+class TestLifespanBehavior:
+    """Tests for server lifespan handling of provider setup/teardown."""
+
+    @pytest.mark.anyio
+    async def test_lifespan_calls_provider_setup_and_teardown(self) -> None:
+        """Lifespan context manager calls provider.setup() and provider.teardown()."""
+        from fastmcp.client import Client
+
+        from unblu_mcp._internal.providers import ConnectionConfig, ConnectionProvider
+
+        class MockProvider(ConnectionProvider):
+            def __init__(self) -> None:
+                self.setup_called = False
+                self.teardown_called = False
+
+            async def setup(self) -> None:
+                self.setup_called = True
+
+            async def teardown(self) -> None:
+                self.teardown_called = True
+
+            def get_config(self) -> ConnectionConfig:
+                return ConnectionConfig(base_url="http://localhost:8080/api")
+
+        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
+        provider = MockProvider()
+        server = create_server(spec_path=spec_path, provider=provider)
+
+        # Before client context, setup should not be called
+        assert not provider.setup_called
+        assert not provider.teardown_called
+
+        # Enter client context (triggers lifespan)
+        async with Client(transport=server):
+            # Inside context, setup should have been called
+            assert provider.setup_called
+            assert not provider.teardown_called
+
+        # After exiting context, teardown should have been called
+        assert provider.teardown_called
+
+    @pytest.mark.anyio
+    async def test_lifespan_teardown_called_on_exception(self) -> None:
+        """Teardown is called even if an exception occurs during server operation."""
+        from fastmcp.client import Client
+
+        from unblu_mcp._internal.providers import ConnectionConfig, ConnectionProvider
+
+        class MockProvider(ConnectionProvider):
+            def __init__(self) -> None:
+                self.setup_called = False
+                self.teardown_called = False
+
+            async def setup(self) -> None:
+                self.setup_called = True
+
+            async def teardown(self) -> None:
+                self.teardown_called = True
+
+            def get_config(self) -> ConnectionConfig:
+                return ConnectionConfig(base_url="http://localhost:8080/api")
+
+        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
+        provider = MockProvider()
+        server = create_server(spec_path=spec_path, provider=provider)
+
+        # Simulate exception during server operation - use helper to satisfy PT012
+        async def _run_and_raise() -> None:
+            async with Client(transport=server):
+                msg = "Simulated error"
+                raise ValueError(msg)
+
+        with pytest.raises(ValueError, match="Simulated error"):
+            await _run_and_raise()
+
+        # Teardown should still be called
+        assert provider.teardown_called
+
+    @pytest.mark.anyio
+    async def test_lifespan_setup_failure_prevents_server_start(self) -> None:
+        """If setup() fails, the server should not start."""
+        from fastmcp.client import Client
+
+        from unblu_mcp._internal.providers import ConnectionConfig, ConnectionProvider
+
+        class FailingProvider(ConnectionProvider):
+            def __init__(self) -> None:
+                self.teardown_called = False
+
+            async def setup(self) -> None:
+                raise RuntimeError("Setup failed")
+
+            async def teardown(self) -> None:
+                self.teardown_called = True
+
+            def get_config(self) -> ConnectionConfig:
+                return ConnectionConfig(base_url="http://localhost:8080/api")
+
+        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
+        provider = FailingProvider()
+        server = create_server(spec_path=spec_path, provider=provider)
+
+        with pytest.raises(RuntimeError, match="Setup failed"):
+            async with Client(transport=server):
+                pass
+
+        # Teardown should NOT be called since setup failed before yield
+        assert not provider.teardown_called
+
+
 class TestCreateServerEdgeCases:
     """Tests for create_server edge cases."""
 
