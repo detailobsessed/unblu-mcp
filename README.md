@@ -252,7 +252,7 @@ Well-behaved MCP clients (like Claude Desktop) will prompt for user confirmation
 
 ### Layer 2: Policy-Based Authorization (Optional)
 
-For **server-side enforcement**, use [Eunomia](https://github.com/whataboutyou-ai/eunomia) to define what operations are allowed:
+For **server-side enforcement**, use [Eunomia](https://github.com/whataboutyou-ai/eunomia) — a FastMCP middleware library for policy-based authorization — to define what operations are allowed:
 
 ```bash
 # Install with safety features

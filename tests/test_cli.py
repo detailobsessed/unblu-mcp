@@ -93,22 +93,38 @@ def test_get_provider_default() -> None:
     assert provider is None
 
 
-def test_get_provider_k8s() -> None:
+def test_get_provider_k8s(tmp_path: Path) -> None:
     """Test _get_provider returns K8sConnectionProvider for k8s provider."""
     from unblu_mcp._internal.cli import _get_provider
     from unblu_mcp._internal.providers_k8s import K8sConnectionProvider
 
-    provider = _get_provider("k8s", "dev")
+    # Create a test config file with dev environment
+    config_file = tmp_path / "k8s_envs.yaml"
+    config_file.write_text("""
+environments:
+  dev:
+    local_port: 8084
+    namespace: unblu-dev
+""")
+    provider = _get_provider("k8s", "dev", str(config_file))
     assert isinstance(provider, K8sConnectionProvider)
     assert provider.environment == "dev"
 
 
-def test_get_provider_k8s_custom_environment() -> None:
+def test_get_provider_k8s_custom_environment(tmp_path: Path) -> None:
     """Test _get_provider with custom environment."""
     from unblu_mcp._internal.cli import _get_provider
     from unblu_mcp._internal.providers_k8s import K8sConnectionProvider
 
-    provider = _get_provider("k8s", "prod")
+    # Create a test config file with prod environment
+    config_file = tmp_path / "k8s_envs.yaml"
+    config_file.write_text("""
+environments:
+  prod:
+    local_port: 8086
+    namespace: unblu-prod
+""")
+    provider = _get_provider("k8s", "prod", str(config_file))
     assert isinstance(provider, K8sConnectionProvider)
     assert provider.environment == "prod"
 

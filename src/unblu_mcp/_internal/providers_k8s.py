@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import shutil
 import socket
 import subprocess
@@ -8,10 +9,15 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-if TYPE_CHECKING:
-    from typing import Any
+from fastmcp.utilities.logging import get_logger
+from filelock import FileLock, Timeout
 
 from unblu_mcp._internal.providers import ConnectionConfig, ConnectionProvider
+
+_logger = get_logger(__name__)
+
+if TYPE_CHECKING:
+    from typing import Any
 
 
 @dataclass
@@ -41,6 +47,9 @@ class K8sEnvironmentConfig:
 _CONFIG_DIR = Path(__file__).parent.parent.parent.parent / "config"
 _USER_CONFIG = _CONFIG_DIR / "k8s_environments.yaml"
 _EXAMPLE_CONFIG = _CONFIG_DIR / "k8s_environments.example.yaml"
+
+# Lock file directory for port-forward coordination
+_LOCK_DIR = Path.home() / ".unblu-mcp" / "locks"
 
 
 def _load_environments_from_yaml(path: Path) -> dict[str, K8sEnvironmentConfig]:
@@ -122,6 +131,8 @@ class K8sConnectionProvider(ConnectionProvider):
         self._trusted_user_id = trusted_user_id
         self._trusted_user_role = trusted_user_role
         self._port_forward_process: subprocess.Popen[bytes] | None = None
+        self._file_lock: FileLock | None = None  # Cross-platform file lock
+        self._owns_port_forward = False  # Whether we started the port-forward
 
     @property
     def environment(self) -> str:
@@ -134,11 +145,36 @@ class K8sConnectionProvider(ConnectionProvider):
         return self._env_config.local_port
 
     async def setup(self) -> None:
-        """Start kubectl port-forward if not already running."""
-        if self._is_port_in_use():
-            # Port-forward already running (maybe from another process)
-            return
+        """Start kubectl port-forward if not already running.
 
+        Uses a lock file to coordinate between multiple MCP server instances.
+        Only one instance will start the port-forward; others will reuse it.
+        """
+        # Try to acquire exclusive lock for this environment's port-forward
+        if self._try_acquire_lock():
+            # We got the lock - we're responsible for the port-forward
+            self._owns_port_forward = True
+            _logger.debug("Acquired port-forward lock for %s", self._env_config.name)
+
+            if not self._is_port_in_use():
+                # Port not in use, start port-forward
+                await self._start_port_forward()
+            else:
+                # Port already in use (orphaned from previous run?), reuse it
+                _logger.debug(
+                    "Port %d already in use, reusing", self._env_config.local_port
+                )
+        else:
+            # Another instance owns the port-forward, just wait for port
+            self._owns_port_forward = False
+            _logger.debug(
+                "Another instance owns port-forward for %s, waiting...",
+                self._env_config.name,
+            )
+            await self._wait_for_port()
+
+    async def _start_port_forward(self) -> None:
+        """Start the kubectl port-forward process."""
         if not shutil.which("kubectl"):
             msg = "kubectl not found in PATH"
             raise RuntimeError(msg)
@@ -159,26 +195,46 @@ class K8sConnectionProvider(ConnectionProvider):
         )
 
         # Wait for port to become available
-        for _ in range(20):  # 10 seconds max
+        await self._wait_for_port()
+
+    async def _wait_for_port(self, timeout: float = 10.0) -> None:
+        """Wait for the port to become available."""
+        iterations = int(timeout / 0.5)
+        for _ in range(iterations):
             await asyncio.sleep(0.5)
             if self._is_port_in_use():
                 return
 
-        # Failed to start
-        self._port_forward_process.kill()
-        self._port_forward_process = None
-        msg = f"Failed to start port-forward to {self._env_config.namespace}"
+        # Failed - clean up if we started the process
+        if self._port_forward_process is not None:
+            self._port_forward_process.kill()
+            self._port_forward_process = None
+        msg = f"Timeout waiting for port {self._env_config.local_port} (env: {self._env_config.namespace})"
         raise RuntimeError(msg)
 
     async def teardown(self) -> None:
-        """Stop the port-forward process if we started it."""
-        if self._port_forward_process is not None:
-            self._port_forward_process.terminate()
-            try:
-                self._port_forward_process.wait(timeout=5)
-            except subprocess.TimeoutExpired:
-                self._port_forward_process.kill()
-            self._port_forward_process = None
+        """Stop the port-forward process only if we own it.
+
+        Only the instance that acquired the lock and started the port-forward
+        will terminate it. Other instances just release their reference.
+        """
+        if self._owns_port_forward:
+            # We own the port-forward, clean it up
+            if self._port_forward_process is not None:
+                _logger.debug("Stopping port-forward for %s", self._env_config.name)
+                self._port_forward_process.terminate()
+                try:
+                    self._port_forward_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    self._port_forward_process.kill()
+                self._port_forward_process = None
+
+            # Release the lock
+            self._release_lock()
+        else:
+            _logger.debug(
+                "Not owner, skipping port-forward cleanup for %s", self._env_config.name
+            )
 
     def get_config(self) -> ConnectionConfig:
         """Return connection config with trusted headers."""
@@ -198,6 +254,39 @@ class K8sConnectionProvider(ConnectionProvider):
         """Check if the local port is in use."""
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             return s.connect_ex(("localhost", self._env_config.local_port)) == 0
+
+    def _get_lock_file_path(self) -> Path:
+        """Get the path to the lock file for this environment."""
+        return _LOCK_DIR / f"port-forward-{self._env_config.name}.lock"
+
+    def _try_acquire_lock(self) -> bool:
+        """Try to acquire an exclusive lock for the port-forward.
+
+        Returns True if we acquired the lock (we should manage the port-forward),
+        False if another process holds it (we should just use the existing port-forward).
+
+        Uses the cross-platform filelock library.
+        """
+        _LOCK_DIR.mkdir(parents=True, exist_ok=True)
+        lock_path = self._get_lock_file_path()
+
+        self._file_lock = FileLock(lock_path)
+        try:
+            # Try to acquire lock without blocking (timeout=0)
+            self._file_lock.acquire(timeout=0)
+        except Timeout:
+            # Lock is held by another process
+            self._file_lock = None
+            return False
+        else:
+            return True
+
+    def _release_lock(self) -> None:
+        """Release the lock file."""
+        if self._file_lock is not None:
+            with contextlib.suppress(Exception):
+                self._file_lock.release()
+            self._file_lock = None
 
 
 def detect_environment_from_context() -> str | None:

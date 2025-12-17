@@ -15,8 +15,6 @@ from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware
 from pydantic import BaseModel, Field
 
-from unblu_mcp._internal.logging import _configure_file_logging
-
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator
 
@@ -344,11 +342,6 @@ Example workflow:
             ),
         )
     )
-
-    # Configure file-based logging with daily rotation
-    # Logs are written to ~/.unblu-mcp/logs/unblu-mcp.log (rotated files: unblu-mcp.log.YYYY-MM-DD)
-    # Can be customized via UNBLU_MCP_LOG_DIR env var or disabled with UNBLU_MCP_LOG_DISABLE=1
-    _configure_file_logging()
 
     # Add error handling middleware for consistent error logging and tracking
     # This catches exceptions, logs them, and converts to proper MCP error responses
