@@ -21,6 +21,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for in
 - [Logging & Observability](#logging--observability)
 - [Safety & Authorization](#safety--authorization)
 - [Programmatic Usage](#programmatic-usage)
+- [Troubleshooting](#troubleshooting)
 - [Development](#development)
 - [License](#license)
 
@@ -388,6 +389,85 @@ class MyProvider(ConnectionProvider):
             base_url="https://api.example.com",
             headers={"X-Custom-Header": "value"},
         )
+```
+
+## Troubleshooting
+
+### GUI Apps Don't Inherit Shell Environment (macOS)
+
+**Problem:** MCP servers fail to start in Windsurf, Claude Desktop, or other GUI apps with errors like:
+- `kubectl not found in PATH`
+- `invalid peer certificate: UnknownIssuer` (TLS/proxy issues)
+- Package installation failures from corporate PyPI mirrors
+
+**Cause:** macOS GUI applications launch from `launchd` with a minimal environment, not from your shell. They don't inherit PATH or other environment variables from `~/.zshrc` or `~/.bashrc`.
+
+**Solution:** Add the `env` block to your MCP configuration:
+
+```json
+{
+  "mcpServers": {
+    "unblu": {
+      "command": "uvx",
+      "args": ["unblu-mcp", "--provider", "k8s", "--environment", "dev"],
+      "env": {
+        "PATH": "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
+      }
+    }
+  }
+}
+```
+
+Add any directories containing tools your setup needs (e.g., kubectl, docker) to the PATH.
+
+### Corporate Proxy/PyPI Mirror Issues
+
+**Problem:** When using `uvx`, you get TLS certificate errors or timeouts connecting to corporate PyPI mirrors.
+
+**Solution:** Use `--no-config` to bypass `uv.toml` settings and `--native-tls` to use system certificates:
+
+```json
+{
+  "mcpServers": {
+    "unblu": {
+      "command": "uvx",
+      "args": [
+        "--no-config",
+        "--native-tls",
+        "unblu-mcp",
+        "--provider", "k8s",
+        "--environment", "dev"
+      ],
+      "env": {
+        "PATH": "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
+      }
+    }
+  }
+}
+```
+
+### Finding MCP Server Logs
+
+Different clients store logs in different locations:
+
+| Client | Log Location |
+|--------|--------------|
+| **Windsurf** | Check Output panel → select "MCP" or "Windsurf" |
+| **Claude Desktop** | `~/Library/Logs/Claude/` (macOS) |
+| **Warp** | `~/Library/Group Containers/2BBY89MBSN.dev.warp/Library/Application Support/dev.warp.Warp-Stable/mcp/*.log` |
+
+### Testing the Server Locally
+
+To debug without an MCP client, use the included test script:
+
+```bash
+# Test with K8s provider
+uv run scripts/test_client.py --provider k8s --environment dev
+
+# Test with default provider (requires UNBLU_BASE_URL)
+UNBLU_BASE_URL=https://your-instance.unblu.cloud/app/rest/v4 \
+UNBLU_API_KEY=your-key \
+uv run scripts/test_client.py
 ```
 
 ## Development
