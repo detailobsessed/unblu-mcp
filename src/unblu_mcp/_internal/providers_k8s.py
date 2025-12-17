@@ -176,7 +176,23 @@ class K8sConnectionProvider(ConnectionProvider):
     async def _start_port_forward(self) -> None:
         """Start the kubectl port-forward process."""
         if not shutil.which("kubectl"):
-            msg = "kubectl not found in PATH"
+            msg = "kubectl not found in PATH. Install kubectl to use the K8s provider."
+            raise RuntimeError(msg)
+
+        # Check if kubectl is authenticated
+        auth_check = subprocess.run(  # noqa: S603
+            ["kubectl", "auth", "can-i", "get", "pods", "-n", self._env_config.namespace],  # noqa: S607
+            capture_output=True,
+            text=True,
+            check=False,
+        )
+        if auth_check.returncode != 0:
+            stderr = auth_check.stderr.strip()
+            msg = (
+                f"kubectl is not authenticated or lacks permissions for namespace '{self._env_config.namespace}'. "
+                f"Please run 'kubectl auth login' or configure your kubeconfig. "
+                f"Error: {stderr or 'unknown'}"
+            )
             raise RuntimeError(msg)
 
         cmd = [
@@ -188,10 +204,12 @@ class K8sConnectionProvider(ConnectionProvider):
             f"{self._env_config.local_port}:{self._env_config.service_port}",
         ]
 
+        _logger.debug("Starting port-forward: %s", " ".join(cmd))
+
         self._port_forward_process = subprocess.Popen(  # noqa: S603
             cmd,
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
         )
 
         # Wait for port to become available
@@ -203,13 +221,36 @@ class K8sConnectionProvider(ConnectionProvider):
         for _ in range(iterations):
             await asyncio.sleep(0.5)
             if self._is_port_in_use():
+                _logger.debug("Port %d is now available", self._env_config.local_port)
                 return
 
-        # Failed - clean up if we started the process
+            # Check if process died early
+            if self._port_forward_process is not None:
+                retcode = self._port_forward_process.poll()
+                if retcode is not None:
+                    # Process exited - get the error
+                    _, stderr = self._port_forward_process.communicate()
+                    stderr_text = stderr.decode().strip() if stderr else "unknown error"
+                    self._port_forward_process = None
+                    msg = (
+                        f"kubectl port-forward failed for {self._env_config.name}: {stderr_text}. "
+                        f"Ensure you are authenticated to the K8s cluster and have access to namespace '{self._env_config.namespace}'."
+                    )
+                    raise RuntimeError(msg)
+
+        # Timeout - clean up if we started the process
         if self._port_forward_process is not None:
             self._port_forward_process.kill()
+            _, stderr = self._port_forward_process.communicate()
+            stderr_text = stderr.decode().strip() if stderr else ""
             self._port_forward_process = None
-        msg = f"Timeout waiting for port {self._env_config.local_port} (env: {self._env_config.namespace})"
+            msg = (
+                f"Timeout waiting for port {self._env_config.local_port} (env: {self._env_config.name}). "
+                f"kubectl stderr: {stderr_text or 'none'}. "
+                f"Ensure kubectl is authenticated and the service '{self._env_config.service}' exists in namespace '{self._env_config.namespace}'."
+            )
+            raise RuntimeError(msg)
+        msg = f"Timeout waiting for port {self._env_config.local_port} (env: {self._env_config.name})"
         raise RuntimeError(msg)
 
     async def teardown(self) -> None:

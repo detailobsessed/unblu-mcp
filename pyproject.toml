@@ -71,6 +71,7 @@ ci = [
     "bandit>=1.8",
     "vulture>=2.13",
     "pyupgrade>=3.19",
+    "pytest-subprocess>=1.5.3",
 ]
 local = [
     "prek>=0.2.20",

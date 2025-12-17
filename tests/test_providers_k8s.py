@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import socket
 import subprocess
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
@@ -14,6 +15,9 @@ from unblu_mcp._internal.providers_k8s import (
     _get_default_environments,
     detect_environment_from_context,
 )
+
+if TYPE_CHECKING:
+    from pytest_subprocess import FakeProcess
 
 # Test environments for use in tests
 TEST_ENVIRONMENTS = {
@@ -157,47 +161,106 @@ class TestK8sConnectionProvider:
             await provider.setup()
 
     @pytest.mark.asyncio
-    async def test_setup_starts_port_forward(self) -> None:
-        """setup() starts kubectl port-forward process when we own the lock."""
+    async def test_setup_kubectl_auth_failure(self, fp: FakeProcess) -> None:
+        """setup() raises RuntimeError if kubectl is not authenticated."""
         provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
-        mock_process = MagicMock()
 
-        # First call returns False (port not in use), subsequent calls return True (port ready)
-        port_check_results = [False, True]
-
-        with (
-            patch.object(provider, "_try_acquire_lock", return_value=True),
-            patch.object(provider, "_is_port_in_use", side_effect=port_check_results),
-            patch("shutil.which", return_value="/usr/bin/kubectl"),
-            patch("subprocess.Popen", return_value=mock_process) as mock_popen,
-        ):
-            await provider.setup()
-
-            assert provider._owns_port_forward is True
-            mock_popen.assert_called_once()
-            call_args = mock_popen.call_args[0][0]
-            assert "kubectl" in call_args
-            assert "port-forward" in call_args
-            assert "-n" in call_args
-            assert "unblu-dev" in call_args
-
-    @pytest.mark.asyncio
-    async def test_setup_timeout_kills_process(self) -> None:
-        """setup() kills process and raises if port never becomes available."""
-        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
-        mock_process = MagicMock()
+        # Register auth check failure
+        fp.register(
+            ["kubectl", "auth", "can-i", "get", "services", "-n", "unblu-dev"],
+            returncode=1,
+            stderr="error: You must be logged in to the server",
+        )
 
         with (
             patch.object(provider, "_try_acquire_lock", return_value=True),
             patch.object(provider, "_is_port_in_use", return_value=False),
             patch("shutil.which", return_value="/usr/bin/kubectl"),
-            patch("subprocess.Popen", return_value=mock_process),
-            patch("asyncio.sleep", new_callable=AsyncMock),
+            pytest.raises(RuntimeError, match="kubectl is not authenticated"),
         ):
-            with pytest.raises(RuntimeError, match="Timeout waiting for port"):
-                await provider.setup()
+            await provider.setup()
 
-            mock_process.kill.assert_called_once()
+    @pytest.mark.asyncio
+    async def test_setup_port_forward_fails_early(self, fp: FakeProcess) -> None:
+        """setup() raises RuntimeError with stderr if port-forward process dies early."""
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
+
+        # Register successful auth check
+        fp.register(
+            ["kubectl", "auth", "can-i", "get", "services", "-n", "unblu-dev"],
+            returncode=0,
+        )
+        # Register failing port-forward
+        fp.register(
+            ["kubectl", "port-forward", "-n", "unblu-dev", "svc/haproxy", "8084:8080"],
+            returncode=1,
+            stderr="error: services 'haproxy' not found",
+        )
+
+        with (
+            patch.object(provider, "_try_acquire_lock", return_value=True),
+            patch.object(provider, "_is_port_in_use", return_value=False),
+            patch("shutil.which", return_value="/usr/bin/kubectl"),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+            pytest.raises(RuntimeError, match="kubectl port-forward failed"),
+        ):
+            await provider.setup()
+
+    @pytest.mark.asyncio
+    async def test_setup_starts_port_forward(self, fp: FakeProcess) -> None:
+        """setup() starts kubectl port-forward process when we own the lock."""
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
+
+        # First call returns False (port not in use), subsequent calls return True (port ready)
+        port_check_results = [False, True]
+
+        # Register successful auth check
+        fp.register(
+            ["kubectl", "auth", "can-i", "get", "services", "-n", "unblu-dev"],
+            returncode=0,
+        )
+        # Register port-forward (keeps running)
+        fp.register(
+            ["kubectl", "port-forward", "-n", "unblu-dev", "svc/haproxy", "8084:8080"],
+            returncode=0,
+        )
+
+        with (
+            patch.object(provider, "_try_acquire_lock", return_value=True),
+            patch.object(provider, "_is_port_in_use", side_effect=port_check_results),
+            patch("shutil.which", return_value="/usr/bin/kubectl"),
+        ):
+            await provider.setup()
+
+            assert provider._owns_port_forward is True
+            # Verify the port-forward command was called
+            assert fp.call_count(["kubectl", "port-forward", fp.any()]) == 1
+
+    @pytest.mark.asyncio
+    async def test_setup_timeout_kills_process(self, fp: FakeProcess) -> None:
+        """setup() kills process and raises if port never becomes available."""
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
+
+        # Register successful auth check
+        fp.register(
+            ["kubectl", "auth", "can-i", "get", "services", "-n", "unblu-dev"],
+            returncode=0,
+        )
+        # Register port-forward that keeps running (simulated by callback)
+        fp.register(
+            ["kubectl", "port-forward", "-n", "unblu-dev", "svc/haproxy", "8084:8080"],
+            returncode=0,
+            wait=0.1,  # Small delay to simulate running process
+        )
+
+        with (
+            patch.object(provider, "_try_acquire_lock", return_value=True),
+            patch.object(provider, "_is_port_in_use", return_value=False),
+            patch("shutil.which", return_value="/usr/bin/kubectl"),
+            patch("asyncio.sleep", new_callable=AsyncMock),
+            pytest.raises(RuntimeError, match="Timeout waiting for port"),
+        ):
+            await provider.setup()
 
     @pytest.mark.asyncio
     async def test_teardown_terminates_process_when_owner(self) -> None:
