@@ -167,7 +167,7 @@ class TestK8sConnectionProvider:
 
         # Register auth check failure
         fp.register(
-            ["kubectl", "auth", "can-i", "get", "services", "-n", "unblu-dev"],
+            ["kubectl", "auth", "can-i", "get", "pods", "-n", "unblu-dev"],
             returncode=1,
             stderr="error: You must be logged in to the server",
         )
@@ -187,7 +187,7 @@ class TestK8sConnectionProvider:
 
         # Register successful auth check
         fp.register(
-            ["kubectl", "auth", "can-i", "get", "services", "-n", "unblu-dev"],
+            ["kubectl", "auth", "can-i", "get", "pods", "-n", "unblu-dev"],
             returncode=0,
         )
         # Register failing port-forward
@@ -216,7 +216,7 @@ class TestK8sConnectionProvider:
 
         # Register successful auth check
         fp.register(
-            ["kubectl", "auth", "can-i", "get", "services", "-n", "unblu-dev"],
+            ["kubectl", "auth", "can-i", "get", "pods", "-n", "unblu-dev"],
             returncode=0,
         )
         # Register port-forward (keeps running)
@@ -243,7 +243,7 @@ class TestK8sConnectionProvider:
 
         # Register successful auth check
         fp.register(
-            ["kubectl", "auth", "can-i", "get", "services", "-n", "unblu-dev"],
+            ["kubectl", "auth", "can-i", "get", "pods", "-n", "unblu-dev"],
             returncode=0,
         )
         # Register port-forward that keeps running (simulated by callback)
