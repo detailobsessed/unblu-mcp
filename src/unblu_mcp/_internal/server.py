@@ -114,8 +114,12 @@ class UnbluAPIRegistry:
         return sorted(self.services.values(), key=lambda s: s.name)
 
     def list_operations(self, service: str) -> list[OperationInfo]:
-        """List operations for a specific service."""
-        op_ids = self.operations_by_service.get(service, [])
+        """List operations for a specific service (case-insensitive)."""
+        # Case-insensitive service lookup
+        service_key = self._find_service_key(service)
+        if service_key is None:
+            return []
+        op_ids = self.operations_by_service.get(service_key, [])
         result = []
         for op_id in op_ids:
             op = self.operations[op_id]
@@ -128,6 +132,18 @@ class UnbluAPIRegistry:
                 ),
             )
         return result
+
+    def _find_service_key(self, service: str) -> str | None:
+        """Find the actual service key (case-insensitive lookup)."""
+        # Exact match first
+        if service in self.operations_by_service:
+            return service
+        # Case-insensitive fallback
+        service_lower = service.lower()
+        for key in self.operations_by_service:
+            if key.lower() == service_lower:
+                return key
+        return None
 
     def search_operations(self, query: str, limit: int = 20) -> list[OperationInfo]:
         """Search operations by name, path, or description."""
