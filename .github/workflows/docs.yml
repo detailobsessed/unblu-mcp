@@ -1,9 +1,9 @@
 name: docs
 
 "on":
-  push:
-    branches:
-      - main
+  workflow_run:
+    workflows: [release]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -17,6 +17,8 @@ concurrency:
 
 jobs:
   build:
+    # Only run if release workflow succeeded (or manual trigger)
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: blacksmith-4vcpu-ubuntu-2404
     steps:
       - name: Checkout

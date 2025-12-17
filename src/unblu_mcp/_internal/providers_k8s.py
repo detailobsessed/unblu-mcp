@@ -161,9 +161,7 @@ class K8sConnectionProvider(ConnectionProvider):
                 await self._start_port_forward()
             else:
                 # Port already in use (orphaned from previous run?), reuse it
-                _logger.debug(
-                    "Port %d already in use, reusing", self._env_config.local_port
-                )
+                _logger.debug("Port %d already in use, reusing", self._env_config.local_port)
         else:
             # Another instance owns the port-forward, just wait for port
             self._owns_port_forward = False
@@ -273,9 +271,7 @@ class K8sConnectionProvider(ConnectionProvider):
             # Release the lock
             self._release_lock()
         else:
-            _logger.debug(
-                "Not owner, skipping port-forward cleanup for %s", self._env_config.name
-            )
+            _logger.debug("Not owner, skipping port-forward cleanup for %s", self._env_config.name)
 
     def get_config(self) -> ConnectionConfig:
         """Return connection config with trusted headers."""
