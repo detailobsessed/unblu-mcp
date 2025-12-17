@@ -320,9 +320,11 @@ def create_server(
     )
 
     # Create FastMCP server with lifespan for provider setup/teardown
+    # mask_error_details=True hides internal errors from clients (they still get logged server-side)
     mcp = FastMCP(
         name="unblu-mcp",
         lifespan=lifespan,
+        mask_error_details=True,
         instructions="""Unblu MCP Server - Token-Efficient API Access
 
 This server provides access to 300+ Unblu API endpoints using progressive disclosure
@@ -403,8 +405,11 @@ Example workflow:
         Returns:
             List of services with name, description, and operation_count.
         """
-        services = registry.list_services()
-        return [s.model_dump() for s in services]
+        try:
+            services = registry.list_services()
+            return [s.model_dump() for s in services]
+        except Exception as e:
+            raise ToolError(f"Failed to list services: {e}") from e
 
     @mcp.tool(
         annotations={
@@ -427,7 +432,10 @@ Example workflow:
         if not operations:
             available = [s.name for s in registry.list_services()][:5]
             raise ToolError(f"Service '{service}' not found. Available services include: {available}")
-        return [op.model_dump() for op in operations]
+        try:
+            return [op.model_dump() for op in operations]
+        except Exception as e:
+            raise ToolError(f"Failed to list operations for '{service}': {e}") from e
 
     @mcp.tool(
         annotations={
@@ -448,8 +456,11 @@ Example workflow:
         Returns:
             List of matching operations with operation_id, method, path, and summary.
         """
-        operations = registry.search_operations(query, limit)
-        return [op.model_dump() for op in operations]
+        try:
+            operations = registry.search_operations(query, limit)
+            return [op.model_dump() for op in operations]
+        except Exception as e:
+            raise ToolError(f"Failed to search operations: {e}") from e
 
     @mcp.tool(
         annotations={
@@ -476,7 +487,10 @@ Example workflow:
             raise ToolError(
                 f"Operation '{operation_id}' not found. Use search_operations() to find valid operation IDs."
             )
-        return schema.model_dump()
+        try:
+            return schema.model_dump()
+        except Exception as e:
+            raise ToolError(f"Failed to get schema for '{operation_id}': {e}") from e
 
     @mcp.tool(
         annotations={
