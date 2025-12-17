@@ -426,6 +426,16 @@ class TestCreateServerEdgeCases:
         assert server is not None
 
 
+# Check if eunomia_mcp is available
+try:
+    import eunomia_mcp  # noqa: F401
+
+    HAS_EUNOMIA = True
+except ImportError:
+    HAS_EUNOMIA = False
+
+
+@pytest.mark.skipif(not HAS_EUNOMIA, reason="eunomia_mcp not installed")
 class TestEunomiaIntegration:
     """Tests for Eunomia authorization middleware integration."""
 
