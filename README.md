@@ -340,6 +340,13 @@ server = create_server(provider=provider)
 
 For Kubernetes deployments, use the built-in K8s provider:
 
+**Prerequisites:**
+- `kubectl` installed and in PATH
+- Authenticated to your K8s cluster (`kubectl auth login` or valid kubeconfig)
+- Permissions to access services in the target namespace
+
+The provider will check authentication before starting port-forward and provide helpful error messages if something is misconfigured.
+
 ```python
 from unblu_mcp import create_server, K8sConnectionProvider
 
