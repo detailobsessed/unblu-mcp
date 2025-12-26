@@ -9,16 +9,14 @@
 # - When you import `__main__` it will get executed again (as a module) because
 #   there's no `unblu_mcp.__main__` in `sys.modules`.
 
-from __future__ import annotations
 
 import argparse
 import sys
-from typing import TYPE_CHECKING, Any
+from typing import Any
+
+from fastmcp import FastMCP
 
 from unblu_mcp._internal import debug
-
-if TYPE_CHECKING:
-    from fastmcp import FastMCP
 
 
 class _DebugInfo(argparse.Action):

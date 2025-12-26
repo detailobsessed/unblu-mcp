@@ -1,13 +1,8 @@
 """Tests for the CLI."""
 
-from __future__ import annotations
-
-from typing import TYPE_CHECKING
+from pathlib import Path
 
 import pytest
-
-if TYPE_CHECKING:
-    from pathlib import Path
 
 from unblu_mcp import main
 from unblu_mcp._internal import debug

@@ -1,11 +1,10 @@
-from __future__ import annotations
-
 import importlib.resources
 import json
 import re
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import Any
 
 import httpx
 from fastmcp import FastMCP
@@ -15,10 +14,7 @@ from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware
 from pydantic import BaseModel, Field
 
-if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-
-    from unblu_mcp._internal.providers import ConnectionProvider
+from unblu_mcp._internal.providers import ConnectionProvider
 
 # Constants for magic values
 _MAX_REF_DEPTH = 3
