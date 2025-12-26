@@ -7,21 +7,15 @@ These tests ensure that every operation in the Unblu API:
 4. Returns a valid schema via get_operation_schema
 """
 
-from __future__ import annotations
-
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import pytest
+from fastmcp import FastMCP
 from fastmcp.client import Client
+from fastmcp.client.transports import FastMCPTransport
 
 from unblu_mcp._internal.server import UnbluAPIRegistry, create_server
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-
-    from fastmcp import FastMCP
-    from fastmcp.client.transports import FastMCPTransport
 
 
 @pytest.fixture(scope="module")

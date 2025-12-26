@@ -1,23 +1,17 @@
 """Comprehensive FastMCP client tests for Unblu MCP server."""
 
-from __future__ import annotations
-
 import json
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import httpx
 import pytest
 import respx
 from fastmcp.client import Client
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 
 from unblu_mcp._internal.server import create_server
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-
-    from fastmcp.client.transports import FastMCPTransport
 
 # Minimal mock spec for unit tests
 MOCK_SWAGGER = {

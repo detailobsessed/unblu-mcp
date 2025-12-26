@@ -1,19 +1,14 @@
 """Tests for our own API exposition."""
 
-from __future__ import annotations
-
 from collections import defaultdict
+from collections.abc import Iterator
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import griffe
 import pytest
 from mkdocstrings import Inventory
 
 import unblu_mcp
-
-if TYPE_CHECKING:
-    from collections.abc import Iterator
 
 
 @pytest.fixture(name="loader", scope="module")

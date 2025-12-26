@@ -1,13 +1,11 @@
 """Tests for the Kubernetes connection provider."""
 
-from __future__ import annotations
-
 import socket
 import subprocess
-from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
+from pytest_subprocess import FakeProcess
 
 from unblu_mcp._internal.providers_k8s import (
     K8sConnectionProvider,
@@ -15,9 +13,6 @@ from unblu_mcp._internal.providers_k8s import (
     _get_default_environments,
     detect_environment_from_context,
 )
-
-if TYPE_CHECKING:
-    from pytest_subprocess import FakeProcess
 
 # Test environments for use in tests
 TEST_ENVIRONMENTS = {

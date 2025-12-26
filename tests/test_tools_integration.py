@@ -4,24 +4,18 @@ These tests verify that all tools work correctly when called through the MCP pro
 catching issues that unit tests might miss (like schema validation, serialization, etc.).
 """
 
-from __future__ import annotations
-
+from collections.abc import AsyncIterator
 from pathlib import Path
-from typing import TYPE_CHECKING
 
 import httpx
 import pytest
 import respx
+from fastmcp import FastMCP
 from fastmcp.client import Client
+from fastmcp.client.transports import FastMCPTransport
 from fastmcp.exceptions import ToolError
 
 from unblu_mcp._internal.server import create_server
-
-if TYPE_CHECKING:
-    from collections.abc import AsyncIterator
-
-    from fastmcp import FastMCP
-    from fastmcp.client.transports import FastMCPTransport
 
 
 @pytest.fixture(scope="module")

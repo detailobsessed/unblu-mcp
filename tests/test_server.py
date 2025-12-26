@@ -1,14 +1,12 @@
 """Tests for the Unblu MCP server."""
 
-from __future__ import annotations
-
 import json
 from pathlib import Path
-from typing import TYPE_CHECKING
 from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
+from fastmcp import FastMCP
 from fastmcp.exceptions import ToolError
 
 from unblu_mcp._internal.server import (
@@ -20,9 +18,6 @@ from unblu_mcp._internal.server import (
     create_server,
     get_server,
 )
-
-if TYPE_CHECKING:
-    from fastmcp import FastMCP
 
 
 @pytest.fixture(scope="module")

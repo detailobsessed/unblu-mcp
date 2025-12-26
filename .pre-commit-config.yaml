@@ -1,32 +1,60 @@
+default_stages: [pre-commit]
+minimum_prek_version: "0.2.25"
+
 repos:
-  - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v6.0.0  # prek autoupdate will fill this
+  # prek builtin hooks - no network/env needed, instant execution
+  - repo: builtin
     hooks:
       - id: trailing-whitespace
+        priority: 0
       - id: end-of-file-fixer
+        priority: 0
       - id: check-yaml
+        priority: 0
       - id: check-toml
+        priority: 0
+      - id: check-json
+        priority: 0
       - id: check-added-large-files
+        priority: 0
       - id: check-merge-conflict
+        priority: 0
+      - id: check-case-conflict
+        priority: 0
+      - id: check-symlinks
+        priority: 0
+      - id: check-executables-have-shebangs
+        priority: 0
+      - id: mixed-line-ending
+        args: [--fix=lf]
+        priority: 0
       - id: detect-private-key
+        priority: 0
+      - id: no-commit-to-branch
+        args: [--branch=main]
+        priority: 0
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.9  # prek autoupdate will fill this
     hooks:
       - id: ruff
         args: [--config, config/ruff.toml, --fix]
+        priority: 1
       - id: ruff-format
         args: [--config, config/ruff.toml]
+        priority: 1
 
   - repo: https://github.com/astral-sh/uv-pre-commit
     rev: 0.9.17  # prek autoupdate will fill this
     hooks:
       - id: uv-lock
+        priority: 1
 
   - repo: https://github.com/rhysd/actionlint
     rev: v1.7.9  # prek autoupdate will fill this
     hooks:
       - id: actionlint
+        priority: 1
 
   - repo: local
     hooks:
@@ -36,6 +64,7 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
+        priority: 1
 
       - id: check-lfs-files
         name: check LFS files are not pointers
@@ -51,6 +80,13 @@ repos:
         pass_filenames: false
         stages: [pre-push]
 
+      - id: tests
+        name: run tests
+        entry: uv run poe test
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
       - id: no-internal-urls
         name: check for internal URLs in pyproject.toml
         entry: bash scripts/check_no_internal_urls.sh
@@ -58,9 +94,9 @@ repos:
         files: pyproject.toml
         pass_filenames: false
 
-  - repo: https://github.com/alessandrojcm/commitlint-pre-commit-hook
-    rev: v9.23.0  # prek autoupdate will fill this
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.6.0  # prek autoupdate will fill this
     hooks:
-      - id: commitlint
+      - id: conventional-pre-commit
         stages: [commit-msg]
-        additional_dependencies: ["@commitlint/config-conventional"]
+        args: ["--verbose"]
