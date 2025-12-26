@@ -10,8 +10,8 @@ license = "ISC"
 license-files = ["LICENSE"]
 readme = "README.md"
 requires-python = ">=3.13"
-keywords = ["mcp", "model-context-protocol", "unblu", "api", "llm", "ai", "chatbot", "customer-service"]
-version = "0.3.4"
+keywords = []
+version = "0.0.0"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -27,30 +27,21 @@ classifiers = [
     "Typing :: Typed",
 ]
 dependencies = [
-    "fastmcp>=2.14.1",
-    "httpx>=0.27.0",
-    "pydantic>=2.0.0",
     "prek",
-    "filelock>=3.20.1",
 ]
 
 [project.urls]
-Homepage = "https://detailobsessed.github.io/unblu-mcp"
-Documentation = "https://detailobsessed.github.io/unblu-mcp"
-Changelog = "https://detailobsessed.github.io/unblu-mcp/changelog"
-Repository = "https://github.com/detailobsessed/unblu-mcp"
-Issues = "https://github.com/detailobsessed/unblu-mcp/issues"
-Discussions = "https://github.com/detailobsessed/unblu-mcp/discussions"
+Homepage = "https://ichoosetoaccept.github.io/unblu-mcp"
+Documentation = "https://ichoosetoaccept.github.io/unblu-mcp"
+Changelog = "https://ichoosetoaccept.github.io/unblu-mcp/changelog"
+Repository = "https://github.com/ichoosetoaccept/unblu-mcp"
+Issues = "https://github.com/ichoosetoaccept/unblu-mcp/issues"
+Discussions = "https://github.com/ichoosetoaccept/unblu-mcp/discussions"
 Gitter = "https://gitter.im/unblu-mcp/community"
-Funding = "https://github.com/sponsors/detailobsessed"
+Funding = "https://github.com/sponsors/ichoosetoaccept"
 
 [project.scripts]
-unblu-mcp = "unblu_mcp._internal.cli:main"
-
-[project.optional-dependencies]
-safety = [
-    "eunomia-mcp>=0.3.10",
-]
+unblu-mcp = "unblu_mcp.cli:main"
 
 [dependency-groups]
 maintain = [
@@ -61,17 +52,14 @@ maintain = [
 ci = [
     "ruff>=0.11",
     "pytest>=8",
-    "pytest-asyncio>=0.24",
     "pytest-cov>=6",
     "pytest-randomly>=3.15",
     "pytest-xdist>=3.5",
-    "respx>=0.21",
     "ty>=0.0.1a20",
     "poethepoet>=0.32",
     "bandit>=1.8",
     "vulture>=2.13",
     "pyupgrade>=3.19",
-    "pytest-subprocess>=1.5.3",
 ]
 local = [
     "prek>=0.2.20",
@@ -92,12 +80,8 @@ docs = [
     "tomli; python_version < '3.11'",
 ]
 
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-
 [tool.uv]
 default-groups = ["maintain", "ci", "docs", "local"]
-package = true
 
 [tool.poe.tasks]
 # Quality checks
@@ -105,22 +89,19 @@ lint = "ruff check src tests --config config/ruff.toml"
 format = "ruff format src tests --config config/ruff.toml"
 typecheck = "ty check src tests"
 security = "bandit -r src -c config/bandit.toml"
-deadcode = "vulture src tests --min-confidence 80"
-upgrade = "pyupgrade --py313-plus src/**/*.py tests/**/*.py"
+deadcode = "vulture src --min-confidence 80"
+upgrade = "pyupgrade --py314-plus src/**/*.py tests/**/*.py"
 
 # Testing
 test = "pytest tests -c config/pytest.ini"
-test-cov = "pytest tests -c config/pytest.ini --cov=src --cov-report=term-missing --cov-report=html"
+test-cov = "pytest tests -c config/pytest.ini --cov=src --cov-report=html"
 
 # Combined tasks
 check = ["lint", "typecheck", "security", "deadcode"]
 fix = ["format", "upgrade"]
 
-# Run pre-commit hooks
-prek = "prek run --all-files"
-
-# MCP
-inspect = "DANGEROUSLY_OMIT_AUTH=true npx -y @modelcontextprotocol/inspector uv run unblu-mcp"
+# Pre-commit
+pre-commit = "prek run --all-files"
 
 # Documentation
 docs = "mkdocs serve"
@@ -129,9 +110,6 @@ docs-deploy = "mkdocs gh-deploy"
 
 # Setup
 setup = "uv sync --all-extras --dev"
-
-# VSCode configuration
-vscode = "cp -r config/vscode/.vscode ."
 
 # GitHub utilities
 releases = "gh release list --limit 10"
@@ -145,8 +123,6 @@ branch = "main"
 build_command = "uv build"
 commit_message = "chore(release): {version}"
 tag_format = "{version}"
-allow_zero_version = true
-major_on_zero = false
 
 [tool.semantic_release.changelog]
 template_dir = "templates"

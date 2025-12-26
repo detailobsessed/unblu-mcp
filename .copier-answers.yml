@@ -1,5 +1,5 @@
 # Changes here will be overwritten by Copier.
-_commit: 2.7.0
+_commit: 2.14.0
 _src_path: gh:ichoosetoaccept/copier-uv-bleeding
 author_email: ismar@gmail.com
 author_fullname: Ismar Iljazovic
@@ -7,4 +7,5 @@ author_username: ichoosetoaccept
 copyright_license: ISC
 project_description: A model context protocol server for interacting with Unblu deployments.
 project_name: unblu-mcp
+project_type: package
 publish_to_pypi: false
