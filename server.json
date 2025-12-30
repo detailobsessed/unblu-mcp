@@ -6,7 +6,7 @@
     "url": "https://github.com/detailobsessed/unblu-mcp",
     "source": "github"
   },
-  "version": "0.3.4",
+  "version": "0.4.0",
   "packages": [
     {
       "registryType": "pypi",
