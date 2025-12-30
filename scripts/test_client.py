@@ -35,7 +35,18 @@ async def run_client(
     k8s_config: str | None = None,
     tool: str | None = None,
 ) -> int:
-    """Run the test client."""
+    """
+    Connect to an in-process unblu-mcp server, list available tools, optionally invoke a specified tool, and return an exit status.
+    
+    Parameters:
+        provider (str): Provider identifier to build the server (e.g., "default" or "k8s").
+        environment (str): Environment name used when building the provider (e.g., "dev").
+        k8s_config (str | None): Path to a Kubernetes environments YAML file when using the "k8s" provider, or None to use defaults.
+        tool (str | None): Name of a specific tool to invoke; if None, the function calls "list_services".
+    
+    Returns:
+        int: Exit status code; `0` on success.
+    """
     # Build the provider
     provider_instance = _get_provider(provider, environment, k8s_config)
 
@@ -74,7 +85,14 @@ async def run_client(
 
 
 def main() -> int:
-    """Main entry point."""
+    """
+    Parse command-line arguments, run the test client against an in-process server, and return an appropriate exit code.
+    
+    If the provider is "k8s" and no --k8s-config is supplied, a default config path within the repository is used when present. Handles interruption and unexpected errors.
+    
+    Returns:
+        int: Exit code — 0 on success, 130 if interrupted by the user (KeyboardInterrupt), 1 for other exceptions.
+    """
     parser = argparse.ArgumentParser(description="Test client for unblu-mcp")
     parser.add_argument(
         "--provider",
