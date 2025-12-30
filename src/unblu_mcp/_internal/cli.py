@@ -17,6 +17,7 @@ from typing import Any
 from fastmcp import FastMCP
 
 from unblu_mcp._internal import debug
+from unblu_mcp._internal.exceptions import ConfigurationError
 
 
 class _DebugInfo(argparse.Action):
@@ -93,7 +94,11 @@ def main(args: list[str] | None = None) -> int:
 
     provider = _get_provider(opts.provider, opts.environment, opts.k8s_config)
     server = _create_server(spec_path=opts.spec, policy_file=opts.policy, provider=provider)
-    server.run()
+    try:
+        server.run()
+    except ConfigurationError as e:
+        print(f"\n❌ Configuration Error: {e}\n", file=sys.stderr)
+        return 1
     return 0
 
 

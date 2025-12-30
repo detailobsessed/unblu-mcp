@@ -7,6 +7,7 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pytest_subprocess import FakeProcess
 
+from unblu_mcp._internal.exceptions import ConfigurationError
 from unblu_mcp._internal.providers_k8s import (
     K8sConnectionProvider,
     K8sEnvironmentConfig,
@@ -144,20 +145,20 @@ class TestK8sConnectionProvider:
 
     @pytest.mark.asyncio
     async def test_setup_kubectl_not_found(self) -> None:
-        """setup() raises RuntimeError if kubectl not found."""
+        """setup() raises ConfigurationError if kubectl not found."""
         provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
 
         with (
             patch.object(provider, "_try_acquire_lock", return_value=True),
             patch.object(provider, "_is_port_in_use", return_value=False),
             patch("shutil.which", return_value=None),
-            pytest.raises(RuntimeError, match="kubectl not found"),
+            pytest.raises(ConfigurationError, match="kubectl not found"),
         ):
             await provider.setup()
 
     @pytest.mark.asyncio
     async def test_setup_kubectl_auth_failure(self, fp: FakeProcess) -> None:
-        """setup() raises RuntimeError if kubectl is not authenticated."""
+        """setup() raises ConfigurationError if kubectl is not authenticated."""
         provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
 
         # Register auth check failure
@@ -171,13 +172,13 @@ class TestK8sConnectionProvider:
             patch.object(provider, "_try_acquire_lock", return_value=True),
             patch.object(provider, "_is_port_in_use", return_value=False),
             patch("shutil.which", return_value="/usr/bin/kubectl"),
-            pytest.raises(RuntimeError, match="kubectl is not authenticated"),
+            pytest.raises(ConfigurationError, match="kubectl is not authenticated"),
         ):
             await provider.setup()
 
     @pytest.mark.asyncio
     async def test_setup_port_forward_fails_early(self, fp: FakeProcess) -> None:
-        """setup() raises RuntimeError with stderr if port-forward process dies early."""
+        """setup() raises ConfigurationError with stderr if port-forward process dies early."""
         provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
 
         # Register successful auth check
@@ -197,7 +198,7 @@ class TestK8sConnectionProvider:
             patch.object(provider, "_is_port_in_use", return_value=False),
             patch("shutil.which", return_value="/usr/bin/kubectl"),
             patch("asyncio.sleep", new_callable=AsyncMock),
-            pytest.raises(RuntimeError, match="kubectl port-forward failed"),
+            pytest.raises(ConfigurationError, match="kubectl port-forward failed"),
         ):
             await provider.setup()
 
@@ -253,7 +254,7 @@ class TestK8sConnectionProvider:
             patch.object(provider, "_is_port_in_use", return_value=False),
             patch("shutil.which", return_value="/usr/bin/kubectl"),
             patch("asyncio.sleep", new_callable=AsyncMock),
-            pytest.raises(RuntimeError, match="Timeout waiting for port"),
+            pytest.raises(ConfigurationError, match=r"(Timeout waiting for port|Port-forward timed out)"),
         ):
             await provider.setup()
 
