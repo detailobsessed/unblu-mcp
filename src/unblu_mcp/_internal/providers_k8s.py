@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING
 from fastmcp.utilities.logging import get_logger
 from filelock import FileLock, Timeout
 
+from unblu_mcp._internal.exceptions import ConfigurationError
 from unblu_mcp._internal.providers import ConnectionConfig, ConnectionProvider
 
 _logger = get_logger(__name__)
@@ -173,7 +174,7 @@ class K8sConnectionProvider(ConnectionProvider):
         """Start the kubectl port-forward process."""
         if not shutil.which("kubectl"):
             msg = "kubectl not found in PATH. Install kubectl to use the K8s provider."
-            raise RuntimeError(msg)
+            raise ConfigurationError(msg)
 
         # Check if kubectl is authenticated (with timeout to avoid hanging)
         try:
@@ -190,7 +191,7 @@ class K8sConnectionProvider(ConnectionProvider):
                 f"This usually means kubectl is waiting for authentication (e.g., OIDC login). "
                 f"Please authenticate using your cluster's auth method (e.g., cloud CLI, kubelogin, or kubeconfig)"
             )
-            raise RuntimeError(msg) from None
+            raise ConfigurationError(msg) from None
         if auth_check.returncode != 0:
             stderr = auth_check.stderr.strip()
             msg = (
@@ -198,7 +199,7 @@ class K8sConnectionProvider(ConnectionProvider):
                 f"Please authenticate using your cluster's auth method (e.g., cloud CLI, kubelogin). "
                 f"Error: {stderr or 'unknown'}"
             )
-            raise RuntimeError(msg)
+            raise ConfigurationError(msg)
 
         cmd = [
             "kubectl",
@@ -241,7 +242,7 @@ class K8sConnectionProvider(ConnectionProvider):
                         f"kubectl port-forward failed for {self._env_config.name}: {stderr_text}. "
                         f"Ensure you are authenticated to the K8s cluster and have access to namespace '{self._env_config.namespace}'."
                     )
-                    raise RuntimeError(msg)
+                    raise ConfigurationError(msg)
 
         # Timeout - clean up if we started the process
         if self._port_forward_process is not None:
@@ -250,13 +251,13 @@ class K8sConnectionProvider(ConnectionProvider):
             stderr_text = stderr.decode().strip() if stderr else ""
             self._port_forward_process = None
             msg = (
-                f"Timeout waiting for port {self._env_config.local_port} (env: {self._env_config.name}). "
+                f"Port-forward timed out for {self._env_config.name} - port did not become available. "
                 f"kubectl stderr: {stderr_text or 'none'}. "
                 f"Ensure kubectl is authenticated and the service '{self._env_config.service}' exists in namespace '{self._env_config.namespace}'."
             )
-            raise RuntimeError(msg)
+            raise ConfigurationError(msg)
         msg = f"Timeout waiting for port {self._env_config.local_port} (env: {self._env_config.name})"
-        raise RuntimeError(msg)
+        raise ConfigurationError(msg)
 
     async def teardown(self) -> None:
         """Stop the port-forward process only if we own it.

@@ -6,6 +6,7 @@ A model context protocol server for interacting with Unblu deployments.
 # Also expose at package level for entry point
 from unblu_mcp._internal import cli
 from unblu_mcp._internal.cli import get_parser, main
+from unblu_mcp._internal.exceptions import ConfigurationError
 from unblu_mcp._internal.providers import (
     ConnectionConfig,
     ConnectionProvider,
@@ -26,6 +27,7 @@ from unblu_mcp._internal.server import (
 )
 
 __all__: list[str] = [
+    "ConfigurationError",
     "ConnectionConfig",
     "ConnectionProvider",
     "DefaultConnectionProvider",
