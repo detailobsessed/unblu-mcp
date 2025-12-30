@@ -141,6 +141,7 @@ watch = "gh run watch"
 
 [tool.semantic_release]
 version_toml = ["pyproject.toml:project.version"]
+version_variables = ["server.json:version"]
 branch = "main"
 build_command = "uv build"
 commit_message = "chore(release): {version}"
