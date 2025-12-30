@@ -35,7 +35,7 @@ repos:
         priority: 0
 
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.14.9  # prek autoupdate will fill this
+    rev: v0.14.10  # prek autoupdate will fill this
     hooks:
       - id: ruff
         args: [--config, config/ruff.toml, --fix]
@@ -45,13 +45,13 @@ repos:
         priority: 1
 
   - repo: https://github.com/astral-sh/uv-pre-commit
-    rev: 0.9.17  # prek autoupdate will fill this
+    rev: 0.9.21  # prek autoupdate will fill this
     hooks:
       - id: uv-lock
         priority: 1
 
   - repo: https://github.com/rhysd/actionlint
-    rev: v1.7.9  # prek autoupdate will fill this
+    rev: v1.7.10  # prek autoupdate will fill this
     hooks:
       - id: actionlint
         priority: 1
@@ -95,7 +95,7 @@ repos:
         pass_filenames: false
 
   - repo: https://github.com/compilerla/conventional-pre-commit
-    rev: v3.6.0  # prek autoupdate will fill this
+    rev: v4.3.0  # prek autoupdate will fill this
     hooks:
       - id: conventional-pre-commit
         stages: [commit-msg]
