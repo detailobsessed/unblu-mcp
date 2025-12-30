@@ -3,7 +3,7 @@
 # This prevents accidentally committing corporate PyPI mirror URLs
 
 # Only allow official PyPI URLs
-PYPI_PATTERN="https://(files\.pythonhosted\.org|pypi\.org)"
+PYPI_PATTERN="https://(files\.pythonhosted\.org|pypi\.org|test\.pypi\.org)"
 
 # Check for any URL in uv.lock that's not from PyPI
 if grep -E "url = \"https?://" uv.lock 2>/dev/null | grep -vE "$PYPI_PATTERN" | grep -q .; then
