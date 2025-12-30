@@ -175,18 +175,27 @@ class K8sConnectionProvider(ConnectionProvider):
             msg = "kubectl not found in PATH. Install kubectl to use the K8s provider."
             raise RuntimeError(msg)
 
-        # Check if kubectl is authenticated
-        auth_check = subprocess.run(  # noqa: S603
-            ["kubectl", "auth", "can-i", "get", "pods", "-n", self._env_config.namespace],  # noqa: S607
-            capture_output=True,
-            text=True,
-            check=False,
-        )
+        # Check if kubectl is authenticated (with timeout to avoid hanging)
+        try:
+            auth_check = subprocess.run(  # noqa: S603
+                ["kubectl", "auth", "can-i", "get", "pods", "-n", self._env_config.namespace],  # noqa: S607
+                capture_output=True,
+                text=True,
+                check=False,
+                timeout=5,  # 5 second timeout to avoid hanging on OIDC prompts
+            )
+        except subprocess.TimeoutExpired:
+            msg = (
+                f"kubectl auth check timed out for namespace '{self._env_config.namespace}'. "
+                f"This usually means kubectl is waiting for authentication (e.g., OIDC login). "
+                f"Please authenticate using your cluster's auth method (e.g., cloud CLI, kubelogin, or kubeconfig)"
+            )
+            raise RuntimeError(msg) from None
         if auth_check.returncode != 0:
             stderr = auth_check.stderr.strip()
             msg = (
                 f"kubectl is not authenticated or lacks permissions for namespace '{self._env_config.namespace}'. "
-                f"Please run 'kubectl auth login' or configure your kubeconfig. "
+                f"Please authenticate using your cluster's auth method (e.g., cloud CLI, kubelogin). "
                 f"Error: {stderr or 'unknown'}"
             )
             raise RuntimeError(msg)
@@ -339,6 +348,7 @@ def detect_environment_from_context() -> str | None:
             capture_output=True,
             text=True,
             check=True,
+            timeout=5,  # 5 second timeout to avoid hanging
         )
         context = result.stdout.strip()
 
@@ -348,5 +358,5 @@ def detect_environment_from_context() -> str | None:
             if f"-{env}-" in context or context.endswith(f"-{env}"):
                 return env
         return None  # noqa: TRY300
-    except (subprocess.CalledProcessError, FileNotFoundError):
+    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
         return None

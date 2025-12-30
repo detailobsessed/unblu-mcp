@@ -25,3 +25,6 @@ config/k8s_environments.yaml
 .mypy_cache/
 .ruff_cache/
 __pycache__/
+
+# mcp-publisher tokens
+.mcpregistry_*

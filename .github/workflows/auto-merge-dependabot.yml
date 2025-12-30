@@ -1,0 +1,15 @@
+name: Auto Merge Dependabot
+
+"on":
+  pull_request:
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    uses: detailobsessed/ci-components/.github/workflows/auto-merge-dependabot.yml@main
+    with:
+      merge-method: squash
+      update-types: minor,patch
