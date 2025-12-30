@@ -16,5 +16,28 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     uses: detailobsessed/ci-components/.github/workflows/semantic-release-uv.yml@main
     with:
-      pypi-publish: ${{ vars.PYPI_PUBLISH }}
+      pypi-publish: "false"
     secrets: inherit
+
+  pypi-publish:
+    needs: release
+    if: needs.release.outputs.released == 'true' && vars.PYPI_PUBLISH == 'true'
+    runs-on: ubuntu-latest
+    environment:
+      name: pypi
+      url: https://pypi.org/p/unblu-mcp
+    permissions:
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.ref }}
+
+      - name: Setup uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Build package
+        run: uv build
+
+      - name: Publish to PyPI
+        run: uv publish
