@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 """Test client for unblu-mcp server.
 
 This script tests the MCP server by connecting as a client and calling tools.
@@ -20,7 +19,14 @@ from __future__ import annotations
 import argparse
 import asyncio
 import sys
+import traceback
 from pathlib import Path
+
+from fastmcp import Client
+
+from unblu_mcp._internal.cli import _create_server, _get_provider
+
+_DESCRIPTION_MAX_LEN = 60
 
 
 async def run_client(
@@ -30,11 +36,6 @@ async def run_client(
     tool: str | None = None,
 ) -> int:
     """Run the test client."""
-    # Import here to avoid issues if fastmcp not installed
-    from fastmcp import Client
-
-    from unblu_mcp._internal.cli import _create_server, _get_provider
-
     # Build the provider
     provider_instance = _get_provider(provider, environment, k8s_config)
 
@@ -51,7 +52,11 @@ async def run_client(
         tools = await client.list_tools()
         print(f"\nAvailable tools ({len(tools)}):")
         for t in tools:
-            print(f"  - {t.name}: {t.description[:60]}..." if len(t.description) > 60 else f"  - {t.name}: {t.description}")
+            print(
+                f"  - {t.name}: {t.description[:_DESCRIPTION_MAX_LEN]}..."
+                if len(t.description) > _DESCRIPTION_MAX_LEN
+                else f"  - {t.name}: {t.description}"
+            )
 
         if tool:
             # Call specific tool
@@ -112,9 +117,7 @@ def main() -> int:
     except KeyboardInterrupt:
         print("\nInterrupted.")
         return 130
-    except Exception as e:
-        print(f"Error: {e}", file=sys.stderr)
-        import traceback
+    except Exception:  # noqa: BLE001
         traceback.print_exc()
         return 1
 

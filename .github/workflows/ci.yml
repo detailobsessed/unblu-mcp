@@ -52,6 +52,7 @@ jobs:
       with:
         fetch-depth: 0
         fetch-tags: true
+        lfs: true
 
     - name: Setup uv and Python
       uses: astral-sh/setup-uv@v7.1.5
