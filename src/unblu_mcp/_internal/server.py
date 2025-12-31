@@ -581,6 +581,9 @@ Example workflow:
         method = op["method"].lower()
         request_headers = dict(headers or {})
 
+        # Ensure connection is alive (handles port-forward restarts for K8s provider)
+        await provider.ensure_connection()
+
         try:
             response = await client.request(
                 method=method,

@@ -74,6 +74,15 @@ class ConnectionProvider(ABC):
         Should be safe to call even if setup() was never called.
         """
 
+    async def ensure_connection(self) -> None:  # noqa: B027
+        """Ensure the connection is alive, restarting if needed.
+
+        Called before each API request. Override this in providers that need
+        to handle connection recovery (e.g., restarting a dead port-forward).
+
+        Default implementation does nothing.
+        """
+
     @abstractmethod
     def get_config(self) -> ConnectionConfig:
         """Return the current connection configuration.
