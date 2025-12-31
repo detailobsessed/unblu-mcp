@@ -1,0 +1,29 @@
+# markdownlint configuration
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+
+default: true
+
+# Allow longer lines (code examples, tables)
+MD013: false
+
+# Allow multiple headings with same content (common in changelogs)
+MD024:
+  siblings_only: true
+
+# Allow multiple top-level headings (mkdocs frontmatter counts as first)
+MD025: false
+
+# Allow trailing punctuation in headings (e.g., "What's new?")
+MD026: false
+
+# Allow inline HTML (needed for some mkdocs features)
+MD033: false
+
+# Allow bare URLs (common in docs)
+MD034: false
+
+# Require language tags on fenced code blocks
+MD040: true
+
+# Disable table column style (cosmetic, tables render fine)
+MD060: false

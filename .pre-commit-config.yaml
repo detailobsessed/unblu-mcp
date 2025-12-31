@@ -34,6 +34,13 @@ repos:
         args: [--branch=main]
         priority: 0
 
+  - repo: https://github.com/igorshubovych/markdownlint-cli
+    rev: v0.47.0
+    hooks:
+      - id: markdownlint
+        args: [--config, config/.markdownlint.yaml, --fix]
+        priority: 1
+
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.14.10  # prek autoupdate will fill this
     hooks:

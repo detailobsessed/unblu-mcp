@@ -18,7 +18,15 @@ nav:
   - Overview: index.md
   - Changelog: changelog.md
   - License: license.md
-- API reference: reference/api.md
+- User Guide:
+  - Getting Started: getting-started.md
+  - Available Tools: tools.md
+  - Kubernetes Provider: kubernetes.md
+  - Safety & Authorization: safety.md
+  - Logging & Observability: logging.md
+  - Programmatic Usage: programmatic.md
+  - Troubleshooting: troubleshooting.md
+- API Reference: reference/api.md
 - Development:
   - Contributing: contributing.md
   - Code of Conduct: code_of_conduct.md
