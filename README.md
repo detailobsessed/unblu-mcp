@@ -50,9 +50,15 @@ Built with [FastMCP 2.14+](https://github.com/jlowin/fastmcp), leveraging cuttin
 
 ## Installation
 
-This package is available on [PyPI](https://pypi.org/project/unblu-mcp/) and designed to be run directly via `uvx` - no installation required. See [MCP Client Configuration](#mcp-client-configuration) below.
+This package is available on [PyPI](https://pypi.org/project/unblu-mcp/). The recommended installation method is via `uv tool install`:
 
-For development or customization, clone from source:
+```bash
+uv tool install unblu-mcp
+```
+
+This installs the `unblu-mcp` command to `~/.local/bin/` and avoids [cache locking issues](https://github.com/astral-sh/uv/issues/11694) that affect long-running MCP servers when using `uvx`.
+
+> **Note:** You can also run directly via `uvx unblu-mcp` without installation, but this will block `uv cache prune` operations while the server is running.
 
 ### From source
 
@@ -78,8 +84,11 @@ The K8s provider automatically manages `kubectl port-forward` connections to you
 {
   "mcpServers": {
     "unblu": {
-      "command": "uvx",
-      "args": ["unblu-mcp", "--provider", "k8s", "--environment", "dev"]
+      "command": "unblu-mcp",
+      "args": ["--provider", "k8s", "--environment", "dev"],
+      "env": {
+        "PATH": "/Users/YOUR_USERNAME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+      }
     }
   }
 }
@@ -91,8 +100,11 @@ The K8s provider automatically manages `kubectl port-forward` connections to you
 {
   "mcpServers": {
     "unblu": {
-      "command": "uvx",
-      "args": ["unblu-mcp", "--provider", "k8s", "--environment", "dev"]
+      "command": "unblu-mcp",
+      "args": ["--provider", "k8s", "--environment", "dev"],
+      "env": {
+        "PATH": "C:\\Users\\YOUR_USERNAME\\.local\\bin;C:\\Program Files\\...;..."
+      }
     }
   }
 }
@@ -108,9 +120,10 @@ For direct API access without Kubernetes:
 {
   "mcpServers": {
     "unblu": {
-      "command": "uvx",
-      "args": ["unblu-mcp"],
+      "command": "unblu-mcp",
+      "args": [],
       "env": {
+        "PATH": "/Users/YOUR_USERNAME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
         "UNBLU_BASE_URL": "https://your-instance.unblu.cloud/app/rest/v4",
         "UNBLU_API_KEY": "your-api-key"
       }
@@ -422,30 +435,25 @@ class MyProvider(ConnectionProvider):
 
 Add any directories containing tools your setup needs (e.g., kubectl, docker) to the PATH.
 
+### `uvx` Blocks uv Cache Cleaning
+
+**Problem:** If you're using `uvx unblu-mcp` instead of the recommended `uv tool install`, tools like `topgrade` or `uv cache prune` will hang with:
+```
+Cache is currently in-use, waiting for other uv processes to finish
+```
+
+**Cause:** This is a [known uv limitation](https://github.com/astral-sh/uv/issues/11694) affecting all long-running `uvx` processes.
+
+**Solution:** Follow the recommended [Installation](#installation) method using `uv tool install unblu-mcp`.
+
 ### Corporate Proxy/PyPI Mirror Issues
 
-**Problem:** When using `uvx`, you get TLS certificate errors or timeouts connecting to corporate PyPI mirrors.
+**Problem:** When installing with `uv tool install`, you get TLS certificate errors or timeouts connecting to corporate PyPI mirrors.
 
 **Solution:** Use `--no-config` to bypass `uv.toml` settings and `--native-tls` to use system certificates:
 
-```json
-{
-  "mcpServers": {
-    "unblu": {
-      "command": "uvx",
-      "args": [
-        "--no-config",
-        "--native-tls",
-        "unblu-mcp",
-        "--provider", "k8s",
-        "--environment", "dev"
-      ],
-      "env": {
-        "PATH": "/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin"
-      }
-    }
-  }
-}
+```bash
+uv tool install --no-config --native-tls unblu-mcp
 ```
 
 ### Finding MCP Server Logs
