@@ -31,7 +31,6 @@ dependencies = [
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
     "prek",
-    "filelock>=3.20.1",
 ]
 
 [project.urls]

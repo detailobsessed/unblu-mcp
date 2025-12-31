@@ -130,18 +130,15 @@ class TestK8sConnectionProvider:
         assert config.headers["x-unblu-trusted-user-role"] == "SUPER_ADMIN"
 
     @pytest.mark.asyncio
-    async def test_setup_port_already_in_use_as_owner(self) -> None:
-        """setup() reuses existing port if we acquire lock but port is in use."""
+    async def test_setup_port_already_in_use(self) -> None:
+        """setup() reuses existing port if port is already in use."""
         provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
 
-        with (
-            patch.object(provider, "_try_acquire_lock", return_value=True),
-            patch.object(provider, "_is_port_in_use", return_value=True),
-        ):
+        with patch.object(provider, "_is_port_in_use", return_value=True):
             await provider.setup()
-            # Should not start a new process but should own the port-forward
+            # Should not start a new process and should not own the port-forward
             assert provider._port_forward_process is None
-            assert provider._owns_port_forward is True
+            assert provider._owns_port_forward is False
 
     @pytest.mark.asyncio
     async def test_setup_kubectl_not_found(self) -> None:
@@ -149,7 +146,6 @@ class TestK8sConnectionProvider:
         provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
 
         with (
-            patch.object(provider, "_try_acquire_lock", return_value=True),
             patch.object(provider, "_is_port_in_use", return_value=False),
             patch("shutil.which", return_value=None),
             pytest.raises(ConfigurationError, match="kubectl not found"),
@@ -169,7 +165,6 @@ class TestK8sConnectionProvider:
         )
 
         with (
-            patch.object(provider, "_try_acquire_lock", return_value=True),
             patch.object(provider, "_is_port_in_use", return_value=False),
             patch("shutil.which", return_value="/usr/bin/kubectl"),
             pytest.raises(ConfigurationError, match="kubectl is not authenticated"),
@@ -194,7 +189,6 @@ class TestK8sConnectionProvider:
         )
 
         with (
-            patch.object(provider, "_try_acquire_lock", return_value=True),
             patch.object(provider, "_is_port_in_use", return_value=False),
             patch("shutil.which", return_value="/usr/bin/kubectl"),
             patch("asyncio.sleep", new_callable=AsyncMock),
@@ -204,7 +198,7 @@ class TestK8sConnectionProvider:
 
     @pytest.mark.asyncio
     async def test_setup_starts_port_forward(self, fp: FakeProcess) -> None:
-        """setup() starts kubectl port-forward process when we own the lock."""
+        """setup() starts kubectl port-forward process when port is not in use."""
         provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
 
         # First call returns False (port not in use), subsequent calls return True (port ready)
@@ -222,7 +216,6 @@ class TestK8sConnectionProvider:
         )
 
         with (
-            patch.object(provider, "_try_acquire_lock", return_value=True),
             patch.object(provider, "_is_port_in_use", side_effect=port_check_results),
             patch("shutil.which", return_value="/usr/bin/kubectl"),
         ):
@@ -250,11 +243,10 @@ class TestK8sConnectionProvider:
         )
 
         with (
-            patch.object(provider, "_try_acquire_lock", return_value=True),
             patch.object(provider, "_is_port_in_use", return_value=False),
             patch("shutil.which", return_value="/usr/bin/kubectl"),
             patch("asyncio.sleep", new_callable=AsyncMock),
-            pytest.raises(ConfigurationError, match=r"(Timeout waiting for port|Port-forward timed out)"),
+            pytest.raises(ConfigurationError, match="Port-forward timed out"),
         ):
             await provider.setup()
 
@@ -266,8 +258,7 @@ class TestK8sConnectionProvider:
         provider._port_forward_process = mock_process
         provider._owns_port_forward = True
 
-        with patch.object(provider, "_release_lock"):
-            await provider.teardown()
+        await provider.teardown()
 
         mock_process.terminate.assert_called_once()
         mock_process.wait.assert_called_once_with(timeout=5)
@@ -282,8 +273,7 @@ class TestK8sConnectionProvider:
         provider._port_forward_process = mock_process
         provider._owns_port_forward = True
 
-        with patch.object(provider, "_release_lock"):
-            await provider.teardown()
+        await provider.teardown()
 
         mock_process.terminate.assert_called_once()
         mock_process.kill.assert_called_once()
@@ -291,14 +281,13 @@ class TestK8sConnectionProvider:
 
     @pytest.mark.asyncio
     async def test_teardown_no_process_when_owner(self) -> None:
-        """teardown() releases lock even if no process was started."""
+        """teardown() handles case where no process was started."""
         provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
         provider._port_forward_process = None
         provider._owns_port_forward = True
 
-        with patch.object(provider, "_release_lock") as mock_release:
-            await provider.teardown()
-            mock_release.assert_called_once()
+        # Should not raise
+        await provider.teardown()
 
     @pytest.mark.asyncio
     async def test_teardown_skips_cleanup_when_not_owner(self) -> None:
@@ -316,18 +305,11 @@ class TestK8sConnectionProvider:
         assert provider._port_forward_process == mock_process
 
     @pytest.mark.asyncio
-    async def test_setup_waits_for_port_when_not_owner(self) -> None:
-        """setup() waits for port when another instance owns the lock."""
+    async def test_setup_reuses_existing_port(self) -> None:
+        """setup() reuses existing port-forward when port is already in use."""
         provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
 
-        # First call returns False (port not ready), second returns True (port ready)
-        port_check_results = [False, True]
-
-        with (
-            patch.object(provider, "_try_acquire_lock", return_value=False),
-            patch.object(provider, "_is_port_in_use", side_effect=port_check_results),
-            patch("asyncio.sleep", new_callable=AsyncMock),
-        ):
+        with patch.object(provider, "_is_port_in_use", return_value=True):
             await provider.setup()
 
             assert provider._owns_port_forward is False
@@ -363,6 +345,51 @@ class TestK8sConnectionProvider:
 
             provider._env_config = K8sEnvironmentConfig(name="test", local_port=port, namespace="test")
             assert provider._is_port_in_use() is True
+
+    @pytest.mark.asyncio
+    async def test_ensure_connection_does_nothing_when_port_available(self) -> None:
+        """ensure_connection() does nothing when port is already available."""
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
+
+        with patch.object(provider, "_is_port_in_use", return_value=True):
+            await provider.ensure_connection()
+            # Should not have started any process
+            assert provider._port_forward_process is None
+
+    @pytest.mark.asyncio
+    async def test_ensure_connection_restarts_dead_port_forward(self, fp: FakeProcess) -> None:
+        """ensure_connection() restarts port-forward when our process died."""
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
+        provider._owns_port_forward = True
+
+        # Simulate a dead process
+        mock_process = MagicMock()
+        mock_process.poll.return_value = 1  # Process exited with code 1
+        provider._port_forward_process = mock_process
+
+        # Port check returns False (not available), then True (after restart)
+        port_check_results = [False, True]
+
+        # Register successful auth check
+        fp.register(
+            ["kubectl", "auth", "can-i", "get", "pods", "-n", "unblu-dev"],
+            returncode=0,
+        )
+        # Register port-forward
+        fp.register(
+            ["kubectl", "port-forward", "-n", "unblu-dev", "svc/haproxy", "8084:8080"],
+            returncode=0,
+        )
+
+        with (
+            patch.object(provider, "_is_port_in_use", side_effect=port_check_results),
+            patch("shutil.which", return_value="/usr/bin/kubectl"),
+        ):
+            await provider.ensure_connection()
+
+            # Should have started a new port-forward
+            assert provider._owns_port_forward is True
+            assert fp.call_count(["kubectl", "port-forward", fp.any()]) == 1
 
 
 class TestDetectEnvironmentFromContext:
