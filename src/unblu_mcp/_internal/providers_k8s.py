@@ -268,14 +268,21 @@ class K8sConnectionProvider(ConnectionProvider):
 
         # Port is not available - need to (re)start port-forward
         if self._owns_port_forward and self._port_forward_process is not None:
-            # Our process died - clean up the zombie
+            # Clean up existing process (dead or malfunctioning)
             retcode = self._port_forward_process.poll()
             if retcode is not None:
                 _logger.warning(
                     "Port-forward process died (exit code %d), restarting...",
                     retcode,
                 )
-                self._port_forward_process = None
+            else:
+                _logger.warning("Port-forward process alive but port not available, killing and restarting...")
+                self._port_forward_process.kill()
+                try:
+                    self._port_forward_process.wait(timeout=5)
+                except subprocess.TimeoutExpired:
+                    _logger.warning("Process did not terminate after kill, continuing anyway")
+            self._port_forward_process = None
 
         # Start a new port-forward
         _logger.info("Restarting port-forward for %s", self._env_config.name)

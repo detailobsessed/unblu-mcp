@@ -391,6 +391,44 @@ class TestK8sConnectionProvider:
             assert provider._owns_port_forward is True
             assert fp.call_count(["kubectl", "port-forward", fp.any()]) == 1
 
+    @pytest.mark.asyncio
+    async def test_ensure_connection_kills_malfunctioning_process(self, fp: FakeProcess) -> None:
+        """ensure_connection() kills alive but malfunctioning port-forward."""
+        provider = K8sConnectionProvider(environment="dev", environments=TEST_ENVIRONMENTS)
+        provider._owns_port_forward = True
+
+        # Simulate alive but malfunctioning process (port not available)
+        mock_process = MagicMock()
+        mock_process.poll.return_value = None  # Process is alive
+        provider._port_forward_process = mock_process
+
+        # Port check returns False (not available), then True (after restart)
+        port_check_results = [False, True]
+
+        # Register successful auth check
+        fp.register(
+            ["kubectl", "auth", "can-i", "get", "pods", "-n", "unblu-dev"],
+            returncode=0,
+        )
+        # Register port-forward
+        fp.register(
+            ["kubectl", "port-forward", "-n", "unblu-dev", "svc/haproxy", "8084:8080"],
+            returncode=0,
+        )
+
+        with (
+            patch.object(provider, "_is_port_in_use", side_effect=port_check_results),
+            patch("shutil.which", return_value="/usr/bin/kubectl"),
+        ):
+            await provider.ensure_connection()
+
+            # Should have killed the malfunctioning process
+            mock_process.kill.assert_called_once()
+            mock_process.wait.assert_called_once_with(timeout=5)
+            # Should have started a new port-forward
+            assert provider._owns_port_forward is True
+            assert fp.call_count(["kubectl", "port-forward", fp.any()]) == 1
+
 
 class TestDetectEnvironmentFromContext:
     """Tests for detect_environment_from_context function."""
