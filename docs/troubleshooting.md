@@ -92,7 +92,7 @@ kubectl is not installed or not in the PATH visible to the MCP client.
 
 Your kubectl context is not authenticated to the cluster.
 
-**Solution:** Run `kubectl auth login` or configure your kubeconfig.
+**Solution:** Authenticate to your cluster using your provider's authentication method (e.g., `gcloud auth login`, `aws eks update-kubeconfig`, `az aks get-credentials`) or configure your kubeconfig.
 
 ### ConfigurationError: Port-forward timed out
 
