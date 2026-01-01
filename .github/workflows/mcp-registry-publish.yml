@@ -1,9 +1,8 @@
 name: MCP Registry Publish
 
 on:
-  workflow_run:
-    workflows: [release]
-    types: [completed]
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
@@ -12,5 +11,4 @@ permissions:
 
 jobs:
   publish:
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     uses: detailobsessed/ci-components/.github/workflows/mcp-registry-publish-bun.yml@main
