@@ -27,3 +27,12 @@ MD040: true
 
 # Disable table column style (cosmetic, tables render fine)
 MD060: false
+
+# Allow first line to not be heading (memory files, issue templates)
+MD041: false
+
+# Allow heading level jumps (issue templates use h3 after frontmatter)
+MD001: false
+
+# Allow indented code blocks (mkdocs tabs use them)
+MD046: false
