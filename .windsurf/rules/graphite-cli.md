@@ -22,7 +22,7 @@ TERMS
   stack:     A sequence of pull requests, each building off of its parent.
              ex: main <- PR "add API" <- PR "update frontend" <- PR "docs"
   trunk:     The branch that stacks are merged into.
-		         ex: main
+           ex: main
   downstack: The PRs below the given PR in a stack, i.e. its ancestors.
   upstack:   The PRs above the given PR in a stack, i.e. its descendants.
 
@@ -69,8 +69,8 @@ LEARN MORE
   Troubleshooting:    https://graphite.dev/docs/troubleshooting
 
 FEEDBACK
-	We'd love to hear your feedback! Join our Slack community at:
-		https://community.graphite.dev
-	or email us at: cli@graphite.dev.
-	You can also submit feedback directly via gt feedback, which
-	has the ability to attach logs if you're experiencing issues.
+ We'd love to hear your feedback! Join our Slack community at:
+  https://community.graphite.dev
+ or email us at: cli@graphite.dev.
+ You can also submit feedback directly via gt feedback, which
+ has the ability to attach logs if you're experiencing issues.

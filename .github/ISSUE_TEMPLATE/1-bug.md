@@ -26,7 +26,7 @@ assignees: [detailobsessed]
      ```
 -->
 
-```
+```bash
 WRITE MRE / INSTRUCTIONS HERE
 ```
 

@@ -77,6 +77,7 @@ Or with environment variables for direct API access:
 ## Documentation
 
 For complete documentation including:
+
 - Detailed configuration options
 - Kubernetes provider setup
 - Safety & authorization policies
