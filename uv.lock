@@ -2981,16 +2981,16 @@ wheels = [
 
 [[package]]
 name = "yore"
-version = "0.4.6"
+version = "0.4.7"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "cappa" },
     { name = "humanize" },
     { name = "packaging" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/ef/c1/f665fa0fbaf69344143a1d5dc60576ccebb8f0d90247605b96137b3081af/yore-0.4.6.tar.gz", hash = "sha256:5308782d10033f162bdad5a06a8b7bda6921196775a5f7dad5380c5a03b9d318", size = 43918, upload-time = "2025-11-10T15:20:33.27Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/d6/81/eff41e135c4dc57db6cb96badefa82b5ed6704982f8620b91c57e65666e1/yore-0.4.7.tar.gz", hash = "sha256:45279f8aabbe9b261220c8b8848ea045a4fa7def1376cab16712415bae9c8491", size = 43230, upload-time = "2026-01-13T14:09:28.713Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/31/74/fb2ed267aa6dddf120996fb84bcea14d3930206de5cafc586e2b17062517/yore-0.4.6-py3-none-any.whl", hash = "sha256:d382a1ae588f4cc4469d7624d862626c8eef45ddb4d75e5e97452e1db33fd4ee", size = 17377, upload-time = "2025-11-10T15:20:32.105Z" },
+    { url = "https://files.pythonhosted.org/packages/c5/ce/867b1c034d48da93923a958f478e21feb5c6974a6275d04d9052f8a8bf84/yore-0.4.7-py3-none-any.whl", hash = "sha256:02f6f9ea7eb71754c7bc92216d4fa40574d81e725a174a3a1674a65286c68a1c", size = 17354, upload-time = "2026-01-13T14:09:27.586Z" },
 ]
 
 [[package]]
