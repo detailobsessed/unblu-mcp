@@ -25,7 +25,31 @@
         {
           "path": "attributes.tool_name",
           "operator": "in",
-          "value": ["list_services", "list_operations", "search_operations", "get_operation_schema"]
+          "value": [
+            "find_operation",
+            "get_current_account",
+            "search_conversations",
+            "get_conversation",
+            "search_persons",
+            "get_person",
+            "search_users",
+            "get_user",
+            "check_agent_availability",
+            "search_named_areas"
+          ]
+        }
+      ],
+      "actions": ["execute"]
+    },
+    {
+      "name": "allow-mutation-tools",
+      "effect": "allow",
+      "principal_conditions": [],
+      "resource_conditions": [
+        {
+          "path": "attributes.tool_name",
+          "operator": "in",
+          "value": ["assign_conversation", "end_conversation"]
         }
       ],
       "actions": ["execute"]
@@ -38,7 +62,7 @@
         {
           "path": "attributes.tool_name",
           "operator": "eq",
-          "value": "call_api"
+          "value": "execute_operation"
         },
         {
           "path": "attributes.args.operation_id",
@@ -56,7 +80,7 @@
         {
           "path": "attributes.tool_name",
           "operator": "eq",
-          "value": "call_api"
+          "value": "execute_operation"
         },
         {
           "path": "attributes.args.operation_id",

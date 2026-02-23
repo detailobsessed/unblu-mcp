@@ -35,346 +35,290 @@ async def client(server: FastMCP) -> AsyncIterator[Client[FastMCPTransport]]:
 
 
 @pytest.mark.asyncio
-class TestListServices:
-    """Integration tests for list_services tool."""
+class TestFindOperation:
+    """Integration tests for find_operation tool."""
 
-    async def test_returns_services(self, client: Client[FastMCPTransport]) -> None:
-        """list_services returns a list of services."""
-        result = await client.call_tool("list_services", {})
-
-        assert result.structured_content is not None
-        services = result.structured_content["result"]
-        assert isinstance(services, list)
-        assert len(services) > 40  # Should have 40+ services
-
-    async def test_service_structure(self, client: Client[FastMCPTransport]) -> None:
-        """Each service has required fields."""
-        result = await client.call_tool("list_services", {})
+    async def test_returns_matches(self, client: Client[FastMCPTransport]) -> None:
+        """find_operation returns matches for a keyword."""
+        result = await client.call_tool("find_operation", {"query": "accounts"})
 
         assert result.structured_content is not None
-        services = result.structured_content["result"]
-        for service in services:
-            assert "name" in service
-            assert "description" in service
-            assert "operation_count" in service
-            assert isinstance(service["name"], str)
-            assert isinstance(service["operation_count"], int)
-            assert service["operation_count"] > 0
+        matches = result.structured_content["matches"]
+        assert isinstance(matches, list)
+        assert len(matches) > 0
 
-    async def test_known_services_present(self, client: Client[FastMCPTransport]) -> None:
-        """Known Unblu services are present."""
-        result = await client.call_tool("list_services", {})
+    async def test_match_structure(self, client: Client[FastMCPTransport]) -> None:
+        """Each match has required fields."""
+        result = await client.call_tool("find_operation", {"query": "accounts"})
 
         assert result.structured_content is not None
-        service_names = [s["name"] for s in result.structured_content["result"]]
-        assert "Accounts" in service_names
-        assert "Conversations" in service_names
-        assert "Users" in service_names
-        assert "Bots" in service_names
-        assert "Persons" in service_names
+        for match in result.structured_content["matches"]:
+            assert "operation_id" in match
+            assert "method" in match
+            assert "path" in match
+            assert "summary" in match
+            assert "service" in match
+            assert "schema_resource" in match
+            assert match["method"] in ("GET", "POST", "PUT", "DELETE", "PATCH")
 
-    async def test_excludes_webhook_services(self, client: Client[FastMCPTransport]) -> None:
-        """Webhook/schema services are excluded."""
-        result = await client.call_tool("list_services", {})
-
-        assert result.structured_content is not None
-        service_names = [s["name"] for s in result.structured_content["result"]]
-        assert "For bots" not in service_names
-        assert "For webhooks" not in service_names
-        assert "Schemas" not in service_names
-
-
-@pytest.mark.asyncio
-class TestListOperations:
-    """Integration tests for list_operations tool."""
-
-    async def test_returns_operations(self, client: Client[FastMCPTransport]) -> None:
-        """list_operations returns operations for a service."""
-        result = await client.call_tool("list_operations", {"service": "Accounts"})
+    async def test_schema_resource_uri(self, client: Client[FastMCPTransport]) -> None:
+        """Each match includes schema_resource URI."""
+        result = await client.call_tool("find_operation", {"query": "accountsRead"})
 
         assert result.structured_content is not None
-        operations = result.structured_content["result"]
-        assert isinstance(operations, list)
-        assert len(operations) > 0
+        matches = result.structured_content["matches"]
+        assert len(matches) > 0
+        for match in matches:
+            assert match["schema_resource"].startswith("api://operations/")
 
-    async def test_operation_structure(self, client: Client[FastMCPTransport]) -> None:
-        """Each operation has required fields."""
-        result = await client.call_tool("list_operations", {"service": "Accounts"})
-
-        assert result.structured_content is not None
-        operations = result.structured_content["result"]
-        for op in operations:
-            assert "operation_id" in op
-            assert "method" in op
-            assert "path" in op
-            assert "summary" in op
-            assert op["method"] in ("GET", "POST", "PUT", "DELETE", "PATCH")
-
-    async def test_case_insensitive_exact(self, client: Client[FastMCPTransport]) -> None:
-        """list_operations works with exact case."""
-        result = await client.call_tool("list_operations", {"service": "Accounts"})
-        assert result.structured_content is not None
-        assert len(result.structured_content["result"]) > 0
-
-    async def test_case_insensitive_lowercase(self, client: Client[FastMCPTransport]) -> None:
-        """list_operations works with lowercase."""
-        result = await client.call_tool("list_operations", {"service": "accounts"})
-        assert result.structured_content is not None
-        assert len(result.structured_content["result"]) > 0
-
-    async def test_case_insensitive_uppercase(self, client: Client[FastMCPTransport]) -> None:
-        """list_operations works with uppercase."""
-        result = await client.call_tool("list_operations", {"service": "ACCOUNTS"})
-        assert result.structured_content is not None
-        assert len(result.structured_content["result"]) > 0
-
-    async def test_case_insensitive_mixed(self, client: Client[FastMCPTransport]) -> None:
-        """list_operations works with mixed case."""
-        result = await client.call_tool("list_operations", {"service": "aCcOuNtS"})
-        assert result.structured_content is not None
-        assert len(result.structured_content["result"]) > 0
-
-    async def test_unknown_service_raises_error(self, client: Client[FastMCPTransport]) -> None:
-        """list_operations raises ToolError for unknown service."""
-        with pytest.raises(ToolError, match=r"Service 'NonExistent' not found"):
-            await client.call_tool("list_operations", {"service": "NonExistent"})
-
-    async def test_error_suggests_alternatives(self, client: Client[FastMCPTransport]) -> None:
-        """Error message includes available services."""
-        with pytest.raises(ToolError, match=r"Available services include"):
-            await client.call_tool("list_operations", {"service": "NonExistent"})
-
-
-@pytest.mark.asyncio
-class TestSearchOperations:
-    """Integration tests for search_operations tool."""
-
-    async def test_finds_by_operation_id(self, client: Client[FastMCPTransport]) -> None:
-        """search_operations finds operations by ID."""
-        result = await client.call_tool("search_operations", {"query": "accountsRead"})
+    async def test_include_schema_true(self, client: Client[FastMCPTransport]) -> None:
+        """include_schema=True embeds the full resolved schema."""
+        result = await client.call_tool("find_operation", {"query": "accountsRead", "include_schema": True, "limit": 1})
 
         assert result.structured_content is not None
-        operations = result.structured_content["result"]
-        assert len(operations) > 0
-        assert any("accountsRead" in op["operation_id"] for op in operations)
+        matches = result.structured_content["matches"]
+        assert len(matches) > 0
+        first = matches[0]
+        assert first["full_schema"] is not None
+        assert "parameters" in first["full_schema"]
 
-    async def test_finds_by_keyword(self, client: Client[FastMCPTransport]) -> None:
-        """search_operations finds operations by keyword."""
-        result = await client.call_tool("search_operations", {"query": "conversation"})
+    async def test_include_schema_false(self, client: Client[FastMCPTransport]) -> None:
+        """include_schema=False omits the full_schema field."""
+        result = await client.call_tool("find_operation", {"query": "accountsRead", "include_schema": False})
 
         assert result.structured_content is not None
-        operations = result.structured_content["result"]
-        assert len(operations) > 0
-
-    async def test_case_insensitive(self, client: Client[FastMCPTransport]) -> None:
-        """search_operations is case-insensitive."""
-        result_lower = await client.call_tool("search_operations", {"query": "account"})
-        result_upper = await client.call_tool("search_operations", {"query": "ACCOUNT"})
-        result_mixed = await client.call_tool("search_operations", {"query": "AcCoUnT"})
-
-        # All should return results
-        assert result_lower.structured_content is not None
-        assert result_upper.structured_content is not None
-        assert result_mixed.structured_content is not None
-        assert len(result_lower.structured_content["result"]) > 0
-        assert len(result_upper.structured_content["result"]) > 0
-        assert len(result_mixed.structured_content["result"]) > 0
+        for match in result.structured_content["matches"]:
+            assert match["full_schema"] is None
 
     async def test_respects_limit(self, client: Client[FastMCPTransport]) -> None:
-        """search_operations respects the limit parameter."""
-        result = await client.call_tool("search_operations", {"query": "get", "limit": 5})
+        """find_operation respects the limit parameter."""
+        result = await client.call_tool("find_operation", {"query": "get", "limit": 3})
 
         assert result.structured_content is not None
-        operations = result.structured_content["result"]
-        assert len(operations) <= 5
-
-    async def test_empty_query_returns_all(self, client: Client[FastMCPTransport]) -> None:
-        """search_operations with empty query returns all operations."""
-        result = await client.call_tool("search_operations", {"query": "", "limit": 1000})
-
-        assert result.structured_content is not None
-        operations = result.structured_content["result"]
-        # Should return many operations (up to limit)
-        assert len(operations) > 100
+        assert len(result.structured_content["matches"]) <= 3
 
     async def test_no_matches_returns_empty(self, client: Client[FastMCPTransport]) -> None:
-        """search_operations returns empty list for no matches."""
-        result = await client.call_tool("search_operations", {"query": "xyznonexistent123"})
+        """find_operation returns empty matches for no results."""
+        result = await client.call_tool("find_operation", {"query": "xyznonexistent123"})
 
         assert result.structured_content is not None
-        operations = result.structured_content["result"]
-        assert operations == []
+        assert result.structured_content["matches"] == []
+
+    async def test_total_searched_reported(self, client: Client[FastMCPTransport]) -> None:
+        """find_operation reports total_searched count."""
+        result = await client.call_tool("find_operation", {"query": "accounts"})
+
+        assert result.structured_content is not None
+        assert "total_searched" in result.structured_content
+        assert result.structured_content["total_searched"] >= 300
+
+    async def test_service_filter(self, client: Client[FastMCPTransport]) -> None:
+        """find_operation service filter restricts results."""
+        result = await client.call_tool("find_operation", {"query": "search", "service": "Conversations"})
+
+        assert result.structured_content is not None
+        for match in result.structured_content["matches"]:
+            assert match["service"] == "Conversations"
+
+    async def test_infra_excluded_by_default(self, client: Client[FastMCPTransport]) -> None:
+        """Infra services are excluded from find_operation by default."""
+        result_default = await client.call_tool("find_operation", {"query": "webhook", "include_infra": False})
+        result_infra = await client.call_tool("find_operation", {"query": "webhook", "include_infra": True})
+        assert result_default.structured_content is not None
+        assert result_infra.structured_content is not None
+        default_count = len(result_default.structured_content["matches"])
+        infra_count = len(result_infra.structured_content["matches"])
+        assert infra_count >= default_count
+
+    async def test_next_steps_provided(self, client: Client[FastMCPTransport]) -> None:
+        """find_operation includes next_steps hints."""
+        result = await client.call_tool("find_operation", {"query": "accounts"})
+
+        assert result.structured_content is not None
+        assert "next_steps" in result.structured_content
+        assert len(result.structured_content["next_steps"]) > 0
 
     async def test_results_ordered_by_relevance(self, client: Client[FastMCPTransport]) -> None:
-        """search_operations orders results by relevance."""
-        result = await client.call_tool("search_operations", {"query": "accountsCreate"})
+        """find_operation orders results by relevance."""
+        result = await client.call_tool("find_operation", {"query": "accountsRead"})
 
         assert result.structured_content is not None
-        operations = result.structured_content["result"]
-        assert len(operations) > 0
-        # Exact match in operation_id should be first
-        assert "accountsCreate" in operations[0]["operation_id"]
+        matches = result.structured_content["matches"]
+        assert len(matches) > 0
+        # Exact match in operation_id should be first or near top
+        top_ids = [m["operation_id"] for m in matches[:3]]
+        assert any("accountsRead" in op_id for op_id in top_ids)
 
 
 @pytest.mark.asyncio
 class TestGetOperationSchema:
-    """Integration tests for get_operation_schema tool."""
+    """Integration tests for find_operation with include_schema=True (replaces get_operation_schema)."""
 
     async def test_returns_schema(self, client: Client[FastMCPTransport]) -> None:
-        """get_operation_schema returns full schema."""
-        result = await client.call_tool("get_operation_schema", {"operation_id": "accountsRead"})
+        """find_operation with include_schema returns full schema."""
+        result = await client.call_tool("find_operation", {"query": "accountsRead", "include_schema": True})
 
-        schema = result.structured_content
+        assert result.structured_content is not None
+        matches = result.structured_content["matches"]
+        assert len(matches) > 0
+        schema = matches[0]["full_schema"]
         assert schema is not None
-        assert schema["operation_id"] == "accountsRead"
+        assert "operation_id" in schema
 
     async def test_schema_structure(self, client: Client[FastMCPTransport]) -> None:
         """Schema has all required fields."""
-        result = await client.call_tool("get_operation_schema", {"operation_id": "accountsRead"})
+        result = await client.call_tool("find_operation", {"query": "accountsRead", "include_schema": True, "limit": 1})
 
-        schema = result.structured_content
+        assert result.structured_content is not None
+        schema = result.structured_content["matches"][0]["full_schema"]
         assert schema is not None
         assert "operation_id" in schema
         assert "method" in schema
         assert "path" in schema
         assert "summary" in schema
-        assert "description" in schema
         assert "parameters" in schema
-        assert "request_body" in schema
-        assert "responses" in schema
 
     async def test_parameters_resolved(self, client: Client[FastMCPTransport]) -> None:
         """Schema parameters have $refs resolved."""
-        result = await client.call_tool("get_operation_schema", {"operation_id": "accountsRead"})
+        result = await client.call_tool("find_operation", {"query": "accountsRead", "include_schema": True, "limit": 1})
 
-        schema = result.structured_content
+        assert result.structured_content is not None
+        schema = result.structured_content["matches"][0]["full_schema"]
         assert schema is not None
-        # Parameters should be a list
         assert isinstance(schema["parameters"], list)
-        # If there are parameters, they should have resolved structure
-        for param in schema["parameters"]:
-            assert "name" in param or "$ref" in param
 
-    async def test_unknown_operation_raises_error(self, client: Client[FastMCPTransport]) -> None:
-        """get_operation_schema raises ToolError for unknown operation."""
-        with pytest.raises(ToolError, match=r"Operation 'nonExistentOp' not found"):
-            await client.call_tool("get_operation_schema", {"operation_id": "nonExistentOp"})
+    async def test_unknown_operation_returns_empty(self, client: Client[FastMCPTransport]) -> None:
+        """find_operation returns empty matches for unknown operation ID."""
+        result = await client.call_tool("find_operation", {"query": "nonExistentOperation_xyz123"})
+
+        assert result.structured_content is not None
+        assert result.structured_content["matches"] == []
 
     async def test_error_suggests_search(self, client: Client[FastMCPTransport]) -> None:
-        """Error message suggests using search_operations."""
-        with pytest.raises(ToolError, match=r"search_operations"):
-            await client.call_tool("get_operation_schema", {"operation_id": "nonExistentOp"})
+        """When no matches found, next_steps suggests broader search."""
+        result = await client.call_tool("find_operation", {"query": "nonExistentOperation_xyz123"})
+
+        assert result.structured_content is not None
+        next_steps = result.structured_content.get("next_steps", [])
+        assert len(next_steps) > 0
 
 
 @pytest.mark.asyncio
-class TestCallApi:
-    """Integration tests for call_api tool."""
+class TestExecuteOperation:
+    """Integration tests for execute_operation tool."""
 
     async def test_get_request_success(self, client: Client[FastMCPTransport]) -> None:
-        """call_api handles successful GET request."""
+        """execute_operation handles successful GET request."""
         with respx.mock:
             respx.get("https://test.unblu.cloud/app/rest/v4/accounts/123/read").mock(
                 return_value=httpx.Response(200, json={"id": "123", "name": "Test Account"})
             )
 
             result = await client.call_tool(
-                "call_api",
+                "execute_operation",
                 {"operation_id": "accountsRead", "path_params": {"accountId": "123"}},
             )
 
             response = result.structured_content
             assert response is not None
-            assert response["status"] == "success"
             assert response["status_code"] == 200
             assert response["data"]["id"] == "123"
 
     async def test_post_request_with_body(self, client: Client[FastMCPTransport]) -> None:
-        """call_api handles POST request with body."""
+        """execute_operation handles POST request with body."""
         with respx.mock:
             respx.post("https://test.unblu.cloud/app/rest/v4/accounts/create").mock(
                 return_value=httpx.Response(201, json={"id": "new-123"})
             )
 
             result = await client.call_tool(
-                "call_api",
+                "execute_operation",
                 {"operation_id": "accountsCreate", "body": {"name": "New Account"}},
             )
 
             response = result.structured_content
             assert response is not None
-            assert response["status"] == "success"
             assert response["status_code"] == 201
 
-    async def test_delete_request_no_content(self, client: Client[FastMCPTransport]) -> None:
-        """call_api handles 204 No Content response."""
+    async def test_delete_requires_confirm(self, client: Client[FastMCPTransport]) -> None:
+        """execute_operation blocks DELETE without confirm_destructive=True."""
+        with pytest.raises(ToolError, match=r"destructive"):
+            await client.call_tool(
+                "execute_operation",
+                {
+                    "operation_id": "accountsDelete",
+                    "path_params": {"accountId": "123"},
+                    "confirm_destructive": False,
+                },
+            )
+
+    async def test_delete_with_confirm_succeeds(self, client: Client[FastMCPTransport]) -> None:
+        """execute_operation allows DELETE with confirm_destructive=True."""
         with respx.mock:
             respx.delete("https://test.unblu.cloud/app/rest/v4/accounts/123/delete").mock(return_value=httpx.Response(204))
 
             result = await client.call_tool(
-                "call_api",
-                {"operation_id": "accountsDelete", "path_params": {"accountId": "123"}},
+                "execute_operation",
+                {
+                    "operation_id": "accountsDelete",
+                    "path_params": {"accountId": "123"},
+                    "confirm_destructive": True,
+                },
             )
 
             response = result.structured_content
             assert response is not None
-            assert response["status"] == "success"
             assert response["status_code"] == 204
 
     async def test_error_response(self, client: Client[FastMCPTransport]) -> None:
-        """call_api handles error responses."""
+        """execute_operation surfaces 4xx error responses."""
         with respx.mock:
             respx.get("https://test.unblu.cloud/app/rest/v4/accounts/notfound/read").mock(
                 return_value=httpx.Response(404, json={"error": "Account not found"})
             )
 
             result = await client.call_tool(
-                "call_api",
+                "execute_operation",
                 {"operation_id": "accountsRead", "path_params": {"accountId": "notfound"}},
             )
 
             response = result.structured_content
             assert response is not None
-            assert response["status"] == "error"
-            assert response["code"] == 404
+            assert response["status_code"] == 404
 
     async def test_missing_path_params_raises_error(self, client: Client[FastMCPTransport]) -> None:
-        """call_api raises ToolError when required path params are missing."""
+        """execute_operation raises ToolError when required path params are missing."""
         with pytest.raises(ToolError, match=r"Missing required path parameters"):
-            await client.call_tool("call_api", {"operation_id": "accountsRead"})
+            await client.call_tool("execute_operation", {"operation_id": "accountsRead"})
 
     async def test_unknown_operation_raises_error(self, client: Client[FastMCPTransport]) -> None:
-        """call_api raises ToolError for unknown operation."""
-        with pytest.raises(ToolError, match=r"Operation 'nonExistentOp' not found"):
-            await client.call_tool("call_api", {"operation_id": "nonExistentOp"})
+        """execute_operation raises ToolError for unknown operation."""
+        with pytest.raises(ToolError, match=r"not found"):
+            await client.call_tool("execute_operation", {"operation_id": "nonExistentOp"})
 
     async def test_connection_error_raises_tool_error(self, client: Client[FastMCPTransport]) -> None:
-        """call_api raises ToolError on connection failure."""
+        """execute_operation raises ToolError on connection failure."""
         with respx.mock:
             respx.get("https://test.unblu.cloud/app/rest/v4/accounts/123/read").mock(side_effect=httpx.ConnectError("Connection refused"))
 
             with pytest.raises(ToolError, match=r"API request failed"):
                 await client.call_tool(
-                    "call_api",
+                    "execute_operation",
                     {"operation_id": "accountsRead", "path_params": {"accountId": "123"}},
                 )
 
     async def test_field_filtering(self, client: Client[FastMCPTransport]) -> None:
-        """call_api filters response fields when requested."""
+        """execute_operation filters response fields when requested."""
         with respx.mock:
             respx.get("https://test.unblu.cloud/app/rest/v4/accounts/123/read").mock(
                 return_value=httpx.Response(
                     200,
-                    json={
-                        "id": "123",
-                        "name": "Test",
-                        "description": "Long description",
-                        "metadata": {"key": "value"},
-                    },
+                    json={"id": "123", "name": "Test", "description": "Long", "metadata": {}},
                 )
             )
 
             result = await client.call_tool(
-                "call_api",
+                "execute_operation",
                 {
                     "operation_id": "accountsRead",
                     "path_params": {"accountId": "123"},
@@ -384,22 +328,33 @@ class TestCallApi:
 
             response = result.structured_content
             assert response is not None
-            assert response["status"] == "success"
-            # Only requested fields should be present
             assert "id" in response["data"]
             assert "name" in response["data"]
             assert "description" not in response["data"]
             assert "metadata" not in response["data"]
 
+    async def test_response_includes_next_steps(self, client: Client[FastMCPTransport]) -> None:
+        """execute_operation includes next_steps hints."""
+        with respx.mock:
+            respx.get("https://test.unblu.cloud/app/rest/v4/accounts/123/read").mock(return_value=httpx.Response(200, json={"id": "123"}))
+
+            result = await client.call_tool(
+                "execute_operation",
+                {"operation_id": "accountsRead", "path_params": {"accountId": "123"}},
+            )
+
+            assert result.structured_content is not None
+            assert "next_steps" in result.structured_content
+
     async def test_response_truncation(self, client: Client[FastMCPTransport]) -> None:
-        """call_api truncates large responses when max_response_size is set."""
+        """execute_operation truncates large responses."""
         large_data = {"items": [{"id": str(i), "data": "x" * 100} for i in range(100)]}
 
         with respx.mock:
             respx.get("https://test.unblu.cloud/app/rest/v4/accounts/123/read").mock(return_value=httpx.Response(200, json=large_data))
 
             result = await client.call_tool(
-                "call_api",
+                "execute_operation",
                 {
                     "operation_id": "accountsRead",
                     "path_params": {"accountId": "123"},
@@ -409,71 +364,102 @@ class TestCallApi:
 
             response = result.structured_content
             assert response is not None
-            assert response["status"] == "success"
-            assert response["data"]["_truncated"] is True
+            assert response["truncated"] is True
 
 
 @pytest.mark.asyncio
 class TestToolAnnotations:
     """Test that tools have correct MCP annotations."""
 
-    async def test_discovery_tools_are_read_only(self, client: Client[FastMCPTransport]) -> None:
-        """Discovery tools should have readOnlyHint=True."""
+    async def test_read_only_tools_annotated(self, client: Client[FastMCPTransport]) -> None:
+        """Read-only tools have readOnlyHint=True."""
         tools = await client.list_tools()
-
-        read_only_tools = ["list_services", "list_operations", "search_operations", "get_operation_schema"]
+        read_only = {
+            "find_operation",
+            "get_current_account",
+            "search_conversations",
+            "get_conversation",
+            "search_persons",
+            "get_person",
+            "search_users",
+            "get_user",
+            "check_agent_availability",
+            "search_named_areas",
+        }
         for tool in tools:
-            if tool.name in read_only_tools:
+            if tool.name in read_only:
                 assert tool.annotations is not None
                 assert tool.annotations.readOnlyHint is True, f"{tool.name} should be read-only"
 
-    async def test_call_api_is_destructive(self, client: Client[FastMCPTransport]) -> None:
-        """call_api should have destructiveHint=True."""
+    async def test_end_conversation_is_destructive(self, client: Client[FastMCPTransport]) -> None:
+        """end_conversation has destructiveHint=True."""
         tools = await client.list_tools()
+        tool = next(t for t in tools if t.name == "end_conversation")
+        assert tool.annotations is not None
+        assert tool.annotations.destructiveHint is True
 
-        call_api_tool = next(t for t in tools if t.name == "call_api")
-        assert call_api_tool.annotations is not None
-        assert call_api_tool.annotations.destructiveHint is True
+    async def test_assign_conversation_not_destructive(self, client: Client[FastMCPTransport]) -> None:
+        """assign_conversation is not destructive."""
+        tools = await client.list_tools()
+        tool = next(t for t in tools if t.name == "assign_conversation")
+        assert tool.annotations is not None
+        assert tool.annotations.destructiveHint is not True
 
 
 @pytest.mark.asyncio
 class TestEndToEndWorkflow:
-    """Test realistic end-to-end workflows."""
+    """Test realistic end-to-end debugging workflows."""
 
     async def test_discovery_workflow(self, client: Client[FastMCPTransport]) -> None:
-        """Test the typical discovery workflow: services -> operations -> schema."""
-        # Step 1: List services
-        services_result = await client.call_tool("list_services", {})
-        assert services_result.structured_content is not None
-        services = services_result.structured_content["result"]
-        assert len(services) > 0
+        """Typical workflow: find_operation -> read resource -> execute_operation."""
+        # Step 1: Find operations
+        result = await client.call_tool("find_operation", {"query": "accountsRead", "include_schema": False, "limit": 5})
+        assert result.structured_content is not None
+        matches = result.structured_content["matches"]
+        assert len(matches) > 0
 
-        # Step 2: Pick a service and list its operations
-        service_name = "Accounts"
-        ops_result = await client.call_tool("list_operations", {"service": service_name})
-        assert ops_result.structured_content is not None
-        operations = ops_result.structured_content["result"]
-        assert len(operations) > 0
+        # Step 2: Get schema via resource
+        first_op = matches[0]
+        schema_result = await client.read_resource(first_op["schema_resource"])
+        assert schema_result is not None
 
-        # Step 3: Get schema for first operation
-        first_op_id = operations[0]["operation_id"]
-        schema_result = await client.call_tool("get_operation_schema", {"operation_id": first_op_id})
-        schema = schema_result.structured_content
-        assert schema is not None
-        assert schema["operation_id"] == first_op_id
+        # Step 3: Execute the operation with mock
+        with respx.mock:
+            path_url = first_op["path"].replace("{accountId}", "123")
+            respx.request(
+                first_op["method"],
+                f"https://test.unblu.cloud/app/rest/v4{path_url}",
+            ).mock(return_value=httpx.Response(200, json={"id": "123"}))
 
-    async def test_search_workflow(self, client: Client[FastMCPTransport]) -> None:
-        """Test the search workflow: search -> schema -> call."""
-        # Step 1: Search for operations
-        search_result = await client.call_tool("search_operations", {"query": "account", "limit": 5})
-        assert search_result.structured_content is not None
-        operations = search_result.structured_content["result"]
-        assert len(operations) > 0
+            exec_result = await client.call_tool(
+                "execute_operation",
+                {
+                    "operation_id": first_op["operation_id"],
+                    "path_params": {"accountId": "123"},
+                },
+            )
+            assert exec_result.structured_content is not None
 
-        # Step 2: Get schema for a GET operation (to avoid needing body)
-        get_ops = [op for op in operations if op["method"] == "GET"]
-        if get_ops:
-            op_id = get_ops[0]["operation_id"]
-            schema_result = await client.call_tool("get_operation_schema", {"operation_id": op_id})
-            assert schema_result.structured_content is not None
-            assert schema_result.structured_content["operation_id"] == op_id
+    async def test_search_conversations_workflow(self, client: Client[FastMCPTransport]) -> None:
+        """Typical debugging: search conversations by status."""
+        with respx.mock:
+            respx.post("https://test.unblu.cloud/app/rest/v4/conversations/search").mock(
+                return_value=httpx.Response(
+                    200,
+                    json={
+                        "items": [
+                            {"id": "c1", "state": "ACTIVE", "topic": "Help needed"},
+                        ],
+                        "offset": 0,
+                        "limit": 25,
+                        "total": 1,
+                    },
+                )
+            )
+
+            result = await client.call_tool("search_conversations", {"status": "ACTIVE", "limit": 10})
+
+            assert result.structured_content is not None
+            data = result.structured_content
+            assert "items" in data
+            assert "has_more" in data

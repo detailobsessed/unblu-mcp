@@ -83,6 +83,19 @@ class TestUnbluAPIRegistry:
         ops = registry.list_operations("NonExistentService")
         assert ops == []
 
+    def test_search_operations_excludes_infra_by_default(self, registry: UnbluAPIRegistry) -> None:
+        """search_operations excludes infra services unless include_infra=True."""
+        results_default = registry.search_operations("webhook", include_infra=False)
+        results_with_infra = registry.search_operations("webhook", include_infra=True)
+        assert len(results_with_infra) >= len(results_default)
+
+    def test_service_tier_assignment(self, registry: UnbluAPIRegistry) -> None:
+        """Services are assigned correct tiers."""
+        services_by_name = {s.name: s for s in registry.list_services()}
+        assert services_by_name["Conversations"].tier == "curated"
+        assert services_by_name["Persons"].tier == "curated"
+        assert services_by_name["Accounts"].tier == "curated"
+
     def test_search_operations(self, registry: UnbluAPIRegistry) -> None:
         """search_operations finds operations by keyword."""
         results = registry.search_operations("create")
@@ -116,6 +129,12 @@ class TestUnbluAPIRegistry:
             ops = registry.list_operations(service.name)
             assert len(ops) == service.operation_count
 
+    def test_list_operations_returns_operation_info(self, registry: UnbluAPIRegistry) -> None:
+        """list_operations returns OperationInfo objects with service field set."""
+        ops = registry.list_operations("Conversations")
+        assert all(isinstance(op, OperationInfo) for op in ops)
+        assert all(op.service == "Conversations" for op in ops)
+
 
 class TestMCPServer:
     """Tests for the MCP server creation."""
@@ -127,24 +146,54 @@ class TestMCPServer:
 
     @pytest.mark.anyio
     async def test_server_has_tools(self, server: FastMCP) -> None:
-        """Server has the expected tools."""
+        """Server has the expected curated debugging tools."""
         tools = await server.list_tools()
         tool_names = [t.name for t in tools]
         expected_tools = [
-            "list_services",
-            "list_operations",
-            "search_operations",
-            "get_operation_schema",
-            "call_api",
+            "find_operation",
+            "execute_operation",
+            "get_current_account",
+            "search_conversations",
+            "get_conversation",
+            "assign_conversation",
+            "end_conversation",
+            "search_persons",
+            "get_person",
+            "search_users",
+            "get_user",
+            "check_agent_availability",
+            "search_named_areas",
         ]
         for tool_name in expected_tools:
             assert tool_name in tool_names, f"Missing tool: {tool_name}"
 
     @pytest.mark.anyio
     async def test_server_tool_count(self, server: FastMCP) -> None:
-        """Server has exactly 5 tools (progressive disclosure pattern)."""
+        """Server has exactly 13 curated tools."""
         tools = await server.list_tools()
-        assert len(tools) == 5
+        assert len(tools) == 13
+
+    @pytest.mark.anyio
+    async def test_server_has_resources(self, server: FastMCP) -> None:
+        """Server exposes the api://services and api://operations resources."""
+        from fastmcp.client import Client
+
+        async with Client(transport=server) as client:
+            resources = await client.list_resources()
+            uris = [str(r.uri) for r in resources]
+            assert "api://services" in uris
+
+    @pytest.mark.anyio
+    async def test_server_has_prompts(self, server: FastMCP) -> None:
+        """Server exposes the three debugging prompts."""
+        from fastmcp.client import Client
+
+        async with Client(transport=server) as client:
+            prompts = await client.list_prompts()
+            prompt_names = [p.name for p in prompts]
+            assert "debug_conversation" in prompt_names
+            assert "find_agent" in prompt_names
+            assert "account_health_check" in prompt_names
 
 
 class TestTokenEfficiency:
@@ -161,16 +210,16 @@ class TestTokenEfficiency:
         # Should have 40+ services (excluding webhook/schema tags)
         assert len(services) >= 40
 
-    def test_progressive_disclosure_ratio(self, registry: UnbluAPIRegistry) -> None:
+    def test_curated_tools_vs_total_operations(self, registry: UnbluAPIRegistry) -> None:
         """Verify the token efficiency claim.
 
-        Instead of 331 tool definitions, we expose 5 meta-tools.
-        This is a ~98% reduction in initial tool definition tokens.
+        Instead of 300+ raw operation definitions, we expose 13 curated typed tools
+        plus an escape hatch. This is a >95% reduction in exposed surface area.
         """
         total_operations = len(registry.operations)
-        meta_tools = 5
-        reduction_ratio = (total_operations - meta_tools) / total_operations
-        assert reduction_ratio > 0.98, f"Expected >98% reduction, got {reduction_ratio:.2%}"
+        curated_tools = 13  # find_operation, execute_operation, + 11 typed tools
+        reduction_ratio = (total_operations - curated_tools) / total_operations
+        assert reduction_ratio > 0.95, f"Expected >95% reduction, got {reduction_ratio:.2%}"
 
 
 class TestUnbluAPIRegistryEdgeCases:
@@ -474,7 +523,7 @@ class TestGetServer:
     def test_get_server_creates_instance(self) -> None:
         """get_server creates server instance on first call."""
         # Reset singleton
-        _ServerHolder.instance = None
+        _ServerHolder._instance = None
 
         with patch("unblu_mcp._internal.server.create_server") as mock_create:
             from fastmcp import FastMCP
@@ -491,13 +540,13 @@ class TestGetServer:
         from fastmcp import FastMCP
 
         mock_server = FastMCP(name="cached")
-        _ServerHolder.instance = mock_server
+        _ServerHolder._instance = mock_server
 
         result = get_server()
         assert result == mock_server
 
         # Reset for other tests
-        _ServerHolder.instance = None
+        _ServerHolder._instance = None
 
 
 class TestToolErrorHandling:
@@ -510,35 +559,30 @@ class TestToolErrorHandling:
         return create_server(spec_path=spec_path)
 
     @pytest.mark.anyio
-    async def test_list_operations_unknown_service_raises_tool_error(self, server_with_tools: FastMCP) -> None:
-        """list_operations raises ToolError for unknown service."""
-        with pytest.raises(McpError, match=r"Service 'NonExistentService' not found"):
-            await server_with_tools.call_tool("list_operations", {"service": "NonExistentService"})
-
-    @pytest.mark.anyio
-    async def test_get_operation_schema_unknown_raises_tool_error(self, server_with_tools: FastMCP) -> None:
-        """get_operation_schema raises ToolError for unknown operation."""
+    async def test_execute_operation_unknown_raises_tool_error(self, server_with_tools: FastMCP) -> None:
+        """execute_operation raises ToolError for unknown operation."""
         with pytest.raises(McpError, match=r"Operation 'nonExistentOp' not found"):
-            await server_with_tools.call_tool("get_operation_schema", {"operation_id": "nonExistentOp"})
+            await server_with_tools.call_tool("execute_operation", {"operation_id": "nonExistentOp"})
 
     @pytest.mark.anyio
-    async def test_call_api_unknown_operation_raises_tool_error(self, server_with_tools: FastMCP) -> None:
-        """call_api raises ToolError for unknown operation."""
-        with pytest.raises(McpError, match=r"Operation 'nonExistentOp' not found"):
-            await server_with_tools.call_tool("call_api", {"operation_id": "nonExistentOp"})
-
-    @pytest.mark.anyio
-    async def test_call_api_missing_path_params_raises_tool_error(self, server_with_tools: FastMCP) -> None:
-        """call_api raises ToolError when required path params are missing."""
+    async def test_execute_operation_missing_path_params_raises_tool_error(self, server_with_tools: FastMCP) -> None:
+        """execute_operation raises ToolError when required path params are missing."""
         # accountsDelete requires accountId path param
         with pytest.raises(McpError, match=r"Missing required path parameters"):
-            await server_with_tools.call_tool("call_api", {"operation_id": "accountsDelete", "path_params": None})
+            await server_with_tools.call_tool("execute_operation", {"operation_id": "accountsDelete", "path_params": None})
 
     @pytest.mark.anyio
-    async def test_call_api_request_error_raises_tool_error(self, server_with_tools: FastMCP) -> None:
-        """call_api raises ToolError on httpx.RequestError."""
-        # Mock the httpx client to raise a connection error
-        # accountsCreate has no path params, so it will reach the HTTP request
+    async def test_execute_operation_delete_without_confirm_raises_tool_error(self, server_with_tools: FastMCP) -> None:
+        """execute_operation blocks DELETE ops without confirm_destructive=True."""
+        with pytest.raises(McpError, match=r"destructive"):
+            await server_with_tools.call_tool(
+                "execute_operation",
+                {"operation_id": "accountsDelete", "path_params": {"accountId": "x"}, "confirm_destructive": False},
+            )
+
+    @pytest.mark.anyio
+    async def test_execute_operation_request_error_raises_tool_error(self, server_with_tools: FastMCP) -> None:
+        """execute_operation raises ToolError on httpx.RequestError."""
         with (
             patch.object(
                 httpx.AsyncClient,
@@ -547,4 +591,103 @@ class TestToolErrorHandling:
             ),
             pytest.raises(McpError, match=r"API request failed"),
         ):
-            await server_with_tools.call_tool("call_api", {"operation_id": "accountsCreate"})
+            await server_with_tools.call_tool("execute_operation", {"operation_id": "accountsCreate"})
+
+    @pytest.mark.anyio
+    async def test_find_operation_returns_matches(self, server_with_tools: FastMCP) -> None:
+        """find_operation returns OperationSearchResult with matches."""
+        result = await server_with_tools.call_tool("find_operation", {"query": "conversation", "include_schema": False})
+        assert result is not None
+
+    @pytest.mark.anyio
+    async def test_get_conversation_unknown_raises_tool_error(self, server_with_tools: FastMCP) -> None:
+        """get_conversation raises ToolError on 404."""
+        with (
+            patch.object(
+                httpx.AsyncClient,
+                "request",
+                return_value=httpx.Response(404, json={"error": "not found"}),
+            ),
+            pytest.raises(McpError, match=r"not found"),
+        ):
+            await server_with_tools.call_tool("get_conversation", {"conversation_id": "does-not-exist"})
+
+    @pytest.mark.anyio
+    async def test_get_person_email_ambiguous_returns_candidates(self, server_with_tools: FastMCP) -> None:
+        """get_person returns PersonAmbiguousResult when email matches multiple persons."""
+        persons = [
+            {"id": "p1", "displayName": "Alice", "personType": "VISITOR", "email": "alice@example.com", "teamId": None},
+            {"id": "p2", "displayName": "Alice B", "personType": "VISITOR", "email": "alice@example.com", "teamId": None},
+        ]
+        with patch.object(
+            httpx.AsyncClient,
+            "request",
+            return_value=httpx.Response(200, json={"items": persons, "offset": 0, "limit": 5, "total": 2}),
+        ):
+            result = await server_with_tools.call_tool("get_person", {"identifier": "alice@example.com"})
+        assert result.structured_content is not None
+        # FastMCP wraps union return types under "result"
+        data = result.structured_content["result"]
+        assert "candidates" in data, "Expected PersonAmbiguousResult with candidates"
+        assert len(data["candidates"]) == 2
+        assert "next_steps" in data
+
+    @pytest.mark.anyio
+    async def test_get_person_name_ambiguous_returns_candidates(self, server_with_tools: FastMCP) -> None:
+        """get_person returns PersonAmbiguousResult when name matches multiple persons."""
+        persons = [
+            {"id": "p1", "displayName": "John Smith", "personType": "VISITOR", "email": None, "teamId": None},
+            {"id": "p2", "displayName": "John Smithson", "personType": "AGENT", "email": None, "teamId": "t1"},
+        ]
+        with patch.object(
+            httpx.AsyncClient,
+            "request",
+            return_value=httpx.Response(200, json={"items": persons, "offset": 0, "limit": 10, "total": 2}),
+        ):
+            result = await server_with_tools.call_tool("get_person", {"identifier": "John"})
+        assert result.structured_content is not None
+        # FastMCP wraps union return types under "result"
+        data = result.structured_content["result"]
+        assert "candidates" in data
+        assert len(data["candidates"]) == 2
+        ids = {c["id"] for c in data["candidates"]}
+        assert ids == {"p1", "p2"}
+
+    @pytest.mark.anyio
+    async def test_get_user_username_lookup_success(self, server_with_tools: FastMCP) -> None:
+        """get_user resolves a username (no @) via /users/getByUsername."""
+        user = {"id": "u1", "username": "bob", "displayName": "Bob", "email": "bob@example.com", "teamId": None}
+        with patch.object(
+            httpx.AsyncClient,
+            "request",
+            return_value=httpx.Response(200, json=user),
+        ):
+            result = await server_with_tools.call_tool("get_user", {"identifier": "bob"})
+        assert result.structured_content is not None
+        data = result.structured_content
+        assert data["id"] == "u1"
+        assert data["display_name"] == "Bob"
+
+    @pytest.mark.anyio
+    async def test_get_user_username_not_found_raises_tool_error(self, server_with_tools: FastMCP) -> None:
+        """get_user raises ToolError when username is not found, with search hint."""
+        with (
+            patch.object(
+                httpx.AsyncClient,
+                "request",
+                return_value=httpx.Response(404, json={"error": "not found"}),
+            ),
+            pytest.raises(McpError, match=r"search_users"),
+        ):
+            await server_with_tools.call_tool("get_user", {"identifier": "ghost"})
+
+    @pytest.mark.anyio
+    async def test_ctx_log_no_session_does_not_raise(self, server_with_tools: FastMCP) -> None:
+        """Tools using _ctx_log must not raise when called without an MCP session.
+
+        Regression test: _ctx_log previously called itself recursively instead of
+        ctx.info(), causing infinite recursion. It now uses contextlib.suppress(RuntimeError)
+        around ctx.info() so tools run cleanly in direct call_tool() invocations.
+        """
+        result = await server_with_tools.call_tool("find_operation", {"query": "accounts", "include_schema": False, "limit": 1})
+        assert result is not None
