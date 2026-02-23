@@ -13,6 +13,8 @@ exclude = [
     '^mailto:',
     # Localhost URLs (e.g. docs preview in CONTRIBUTING.md)
     '^http://localhost',
+    # Discussions URL - category may not exist yet
+    'github\.com/.*/discussions/new',
 ]
 
 # Exclude local/private addresses

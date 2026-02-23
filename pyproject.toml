@@ -176,6 +176,10 @@ ignore = [
     "ARG002",     # Unused method arguments (fixtures)
     "DTZ005",     # Naive datetime in tests is fine
     "PLR0904",    # Test classes naturally have many test methods
+    "TC001", "TC002", "TC003",  # Type-only imports needed at runtime for pytest fixtures
+    "RUF067",     # tests/__init__.py uses module-level constants for path helpers
+    "PERF401",    # List comprehension style in tests — clarity over micro-optimisation
+    "PLR6201",    # Set literal — tuple membership is fine in test assertions
 ]
 
 [tool.ruff.lint.pylint]

@@ -6,7 +6,7 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
-from fastmcp import FastMCP  # noqa: TC002
+from fastmcp import FastMCP
 from mcp.shared.exceptions import McpError
 
 from unblu_mcp._internal.server import (

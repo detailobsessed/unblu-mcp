@@ -1,7 +1,7 @@
 import asyncio
 import shutil
 import socket
-import subprocess
+import subprocess  # noqa: S404
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -239,7 +239,8 @@ class K8sConnectionProvider(ConnectionProvider):
             msg = (
                 f"Port-forward timed out for {self._env_config.name} - port did not become available. "
                 f"kubectl stderr: {stderr_text or 'none'}. "
-                f"Ensure kubectl is authenticated and the service '{self._env_config.service}' exists in namespace '{self._env_config.namespace}'."
+                f"Ensure kubectl is authenticated and the service '{self._env_config.service}' "
+                f"exists in namespace '{self._env_config.namespace}'."
             )
             raise ConfigurationError(msg)
 
@@ -334,5 +335,5 @@ def detect_environment_from_context() -> str | None:
             if f"-{env}-" in context or context.endswith(f"-{env}"):
                 return env
         return None  # noqa: TRY300
-    except (subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired):
+    except subprocess.CalledProcessError, FileNotFoundError, subprocess.TimeoutExpired:
         return None

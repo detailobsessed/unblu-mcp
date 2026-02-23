@@ -1,10 +1,11 @@
+from __future__ import annotations
+
 import importlib.resources
 import json
 import re
-from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import httpx
 from fastmcp import FastMCP
@@ -14,7 +15,10 @@ from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware
 from pydantic import BaseModel, Field
 
-from unblu_mcp._internal.providers import ConnectionProvider
+if TYPE_CHECKING:
+    from collections.abc import AsyncIterator
+
+    from unblu_mcp._internal.providers import ConnectionProvider
 
 # Constants for magic values
 _MAX_REF_DEPTH = 3
@@ -80,7 +84,7 @@ class UnbluAPIRegistry:
         # Parse paths (operations)
         for path, path_item in self.spec.get("paths", {}).items():
             for method, operation in path_item.items():
-                if method in ("get", "post", "put", "delete", "patch"):
+                if method in {"get", "post", "put", "delete", "patch"}:
                     op_id = operation.get("operationId", f"{method}_{path}")
                     tags = operation.get("tags", ["Other"])
                     primary_tag = tags[0] if tags else "Other"
@@ -231,7 +235,7 @@ class UnbluAPIRegistry:
         return obj
 
 
-def create_server(
+def create_server(  # noqa: PLR0913, PLR0917, PLR0915
     spec_path: str | Path | None = None,
     base_url: str | None = None,
     api_key: str | None = None,
@@ -289,20 +293,21 @@ def create_server(
             spec_file = importlib.resources.files("unblu_mcp").joinpath("swagger.json")
             spec_content = spec_file.read_text(encoding="utf-8")
             spec = json.loads(spec_content)
-        except (FileNotFoundError, TypeError):
+        except FileNotFoundError, TypeError:
             # Fall back to file system for development
             candidates = [
                 Path.cwd() / "swagger.json",
             ]
             for candidate in candidates:
                 if candidate.exists():
-                    with open(candidate, encoding="utf-8") as f:
+                    with Path(candidate).open(encoding="utf-8") as f:
                         spec = json.load(f)
                     break
             else:
-                raise FileNotFoundError("swagger.json not found. Please provide spec_path.")
+                msg = "swagger.json not found. Please provide spec_path."
+                raise FileNotFoundError(msg)
     else:
-        with open(spec_path, encoding="utf-8") as f:
+        with Path(spec_path).open(encoding="utf-8") as f:
             spec = json.load(f)
 
     registry = UnbluAPIRegistry(spec)
@@ -377,13 +382,13 @@ Example workflow:
 
             policy_path = Path(policy_file) if isinstance(policy_file, str) else policy_file
             if not policy_path.exists():
-                raise FileNotFoundError(f"Policy file not found: {policy_path}")
+                msg = f"Policy file not found: {policy_path}"
+                raise FileNotFoundError(msg)
             middleware = create_eunomia_middleware(policy_file=str(policy_path))
             mcp.add_middleware(middleware)
         except ImportError as e:
-            raise ImportError(
-                "eunomia-mcp is required for policy-based authorization. Install with: pip install unblu-mcp[safety]"
-            ) from e
+            msg = "eunomia-mcp is required for policy-based authorization. Install with: pip install unblu-mcp[safety]"
+            raise ImportError(msg) from e
 
     @mcp.tool(
         annotations={
@@ -392,7 +397,7 @@ Example workflow:
             "openWorldHint": False,
         },
     )
-    async def list_services() -> list[dict[str, Any]]:
+    def list_services() -> list[dict[str, Any]]:
         """List all available Unblu API service categories.
 
         Returns a list of services (API tags) with their descriptions and
@@ -405,7 +410,8 @@ Example workflow:
             services = registry.list_services()
             return [s.model_dump() for s in services]
         except Exception as e:
-            raise ToolError(f"Failed to list services: {e}") from e
+            msg = f"Failed to list services: {e}"
+            raise ToolError(msg) from e
 
     @mcp.tool(
         annotations={
@@ -414,7 +420,7 @@ Example workflow:
             "openWorldHint": False,
         },
     )
-    async def list_operations(service: str) -> list[dict[str, Any]]:
+    def list_operations(service: str) -> list[dict[str, Any]]:
         """List all operations available in a specific service.
 
         Args:
@@ -427,11 +433,13 @@ Example workflow:
         operations = registry.list_operations(service)
         if not operations:
             available = [s.name for s in registry.list_services()][:5]
-            raise ToolError(f"Service '{service}' not found. Available services include: {available}")
+            msg = f"Service '{service}' not found. Available services include: {available}"
+            raise ToolError(msg)
         try:
             return [op.model_dump() for op in operations]
         except Exception as e:
-            raise ToolError(f"Failed to list operations for '{service}': {e}") from e
+            msg = f"Failed to list operations for '{service}': {e}"
+            raise ToolError(msg) from e
 
     @mcp.tool(
         annotations={
@@ -440,7 +448,7 @@ Example workflow:
             "openWorldHint": False,
         },
     )
-    async def search_operations(query: str, limit: int = 20) -> list[dict[str, Any]]:
+    def search_operations(query: str, limit: int = 20) -> list[dict[str, Any]]:
         """Search for API operations by keyword.
 
         Searches operation IDs, paths, summaries, and descriptions.
@@ -456,7 +464,8 @@ Example workflow:
             operations = registry.search_operations(query, limit)
             return [op.model_dump() for op in operations]
         except Exception as e:
-            raise ToolError(f"Failed to search operations: {e}") from e
+            msg = f"Failed to search operations: {e}"
+            raise ToolError(msg) from e
 
     @mcp.tool(
         annotations={
@@ -465,7 +474,7 @@ Example workflow:
             "openWorldHint": False,
         },
     )
-    async def get_operation_schema(operation_id: str) -> dict[str, Any]:
+    def get_operation_schema(operation_id: str) -> dict[str, Any]:
         """Get the full schema for a specific API operation.
 
         Use this to understand the required parameters and request body
@@ -480,13 +489,13 @@ Example workflow:
         """
         schema = registry.get_operation_schema(operation_id)
         if not schema:
-            raise ToolError(
-                f"Operation '{operation_id}' not found. Use search_operations() to find valid operation IDs."
-            )
+            msg = f"Operation '{operation_id}' not found. Use search_operations() to find valid operation IDs."
+            raise ToolError(msg)
         try:
             return schema.model_dump()
         except Exception as e:
-            raise ToolError(f"Failed to get schema for '{operation_id}': {e}") from e
+            msg = f"Failed to get schema for '{operation_id}': {e}"
+            raise ToolError(msg) from e
 
     @mcp.tool(
         annotations={
@@ -497,7 +506,7 @@ Example workflow:
             "openWorldHint": True,
         },
     )
-    async def call_api(
+    async def call_api(  # noqa: PLR0913, PLR0917, PLR0912, PLR0915
         operation_id: str,
         path_params: dict[str, str] | None = None,
         query_params: dict[str, Any] | None = None,
@@ -523,9 +532,8 @@ Example workflow:
         """
         op = registry.operations.get(operation_id)
         if not op:
-            raise ToolError(
-                f"Operation '{operation_id}' not found. Use search_operations() to find valid operation IDs."
-            )
+            msg = f"Operation '{operation_id}' not found. Use search_operations() to find valid operation IDs."
+            raise ToolError(msg)
 
         def _filter_fields(data: Any, fields: list[str]) -> Any:
             """Filter response data to include only specified field paths.
@@ -573,9 +581,8 @@ Example workflow:
         # Check for unresolved path parameters
         if "{" in path:
             missing = re.findall(r"\{(\w+)\}", path)[:3]
-            raise ToolError(
-                f"Missing required path parameters: {missing}. Use get_operation_schema() to see required parameters."
-            )
+            msg = f"Missing required path parameters: {missing}. Use get_operation_schema() to see required parameters."
+            raise ToolError(msg)
 
         # Build request
         method = op["method"].lower()
@@ -589,7 +596,7 @@ Example workflow:
                 method=method,
                 url=path,
                 params=query_params,
-                json=body if body else None,
+                json=body or None,
                 headers=request_headers,
             )
 
@@ -636,7 +643,8 @@ Example workflow:
             }
 
         except httpx.RequestError as e:
-            raise ToolError(f"API request failed: {e!s}") from e
+            msg = f"API request failed: {e!s}"
+            raise ToolError(msg) from e
 
     return mcp
 

@@ -26,7 +26,7 @@ def spec() -> dict:
     spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
     if not spec_path.exists():
         pytest.skip("swagger.json not found")
-    with open(spec_path, encoding="utf-8") as f:
+    with Path(spec_path).open(encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -63,15 +63,13 @@ def expected_operations(spec: dict) -> list[dict]:
                     continue
 
                 path_params = re.findall(r"\{(\w+)\}", path)
-                operations.append(
-                    {
-                        "operation_id": op_id,
-                        "method": method.upper(),
-                        "path": path,
-                        "service": primary_tag,
-                        "path_params": path_params,
-                    }
-                )
+                operations.append({
+                    "operation_id": op_id,
+                    "method": method.upper(),
+                    "path": path,
+                    "service": primary_tag,
+                    "path_params": path_params,
+                })
     return operations
 
 
@@ -175,9 +173,7 @@ class TestMCPToolsExhaustive:
         async with Client(transport=server) as c:
             yield c
 
-    async def test_all_operations_in_list_operations(
-        self, client: Client[FastMCPTransport], expected_operations: list[dict]
-    ) -> None:
+    async def test_all_operations_in_list_operations(self, client: Client[FastMCPTransport], expected_operations: list[dict]) -> None:
         """Every operation should appear in list_operations for its service."""
         # Group by service
         by_service: dict[str, set[str]] = {}
@@ -196,9 +192,7 @@ class TestMCPToolsExhaustive:
 
         assert not failures, f"list_operations failures: {failures[:10]}"
 
-    async def test_all_operations_searchable(
-        self, client: Client[FastMCPTransport], expected_operations: list[dict]
-    ) -> None:
+    async def test_all_operations_searchable(self, client: Client[FastMCPTransport], expected_operations: list[dict]) -> None:
         """Every operation should be findable via search_operations."""
         # Test a sample (testing all 331 would be slow)
         sample = expected_operations[::10]  # Every 10th operation

@@ -308,9 +308,7 @@ class TestCallApi:
     async def test_delete_request_no_content(self, client: Client[FastMCPTransport]) -> None:
         """call_api handles 204 No Content response."""
         with respx.mock:
-            respx.delete("https://test.unblu.cloud/app/rest/v4/accounts/123/delete").mock(
-                return_value=httpx.Response(204)
-            )
+            respx.delete("https://test.unblu.cloud/app/rest/v4/accounts/123/delete").mock(return_value=httpx.Response(204))
 
             result = await client.call_tool(
                 "call_api",
@@ -352,9 +350,7 @@ class TestCallApi:
     async def test_connection_error_raises_tool_error(self, client: Client[FastMCPTransport]) -> None:
         """call_api raises ToolError on connection failure."""
         with respx.mock:
-            respx.get("https://test.unblu.cloud/app/rest/v4/accounts/123/read").mock(
-                side_effect=httpx.ConnectError("Connection refused")
-            )
+            respx.get("https://test.unblu.cloud/app/rest/v4/accounts/123/read").mock(side_effect=httpx.ConnectError("Connection refused"))
 
             with pytest.raises(ToolError, match=r"API request failed"):
                 await client.call_tool(
@@ -400,9 +396,7 @@ class TestCallApi:
         large_data = {"items": [{"id": str(i), "data": "x" * 100} for i in range(100)]}
 
         with respx.mock:
-            respx.get("https://test.unblu.cloud/app/rest/v4/accounts/123/read").mock(
-                return_value=httpx.Response(200, json=large_data)
-            )
+            respx.get("https://test.unblu.cloud/app/rest/v4/accounts/123/read").mock(return_value=httpx.Response(200, json=large_data))
 
             result = await client.call_tool(
                 "call_api",

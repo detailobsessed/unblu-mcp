@@ -8,9 +8,9 @@ from collections import defaultdict
 from pathlib import Path
 
 
-def main() -> None:
+def main() -> None:  # noqa: PLR0912
     spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
-    with open(spec_path) as f:
+    with Path(spec_path).open(encoding="utf-8") as f:
         spec = json.load(f)
 
     # Get tag groups (x-tagGroups)
@@ -40,7 +40,7 @@ def main() -> None:
 
     for path, path_item in spec.get("paths", {}).items():
         for method, operation in path_item.items():
-            if method in ("get", "post", "put", "delete", "patch"):
+            if method in {"get", "post", "put", "delete", "patch"}:
                 op_id = operation.get("operationId", f"{method}_{path}")
                 tags = operation.get("tags", ["Other"])
                 primary_tag = tags[0] if tags else "Other"
