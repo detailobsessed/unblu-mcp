@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 """Test client for unblu-mcp server.
 
 This script tests the MCP server by connecting as a client and calling tools.
@@ -117,7 +118,7 @@ def main() -> int:
     except KeyboardInterrupt:
         print("\nInterrupted.")
         return 130
-    except Exception:  # noqa: BLE001
+    except Exception:
         traceback.print_exc()
         return 1
 

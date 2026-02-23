@@ -3,7 +3,7 @@ site_description: "A model context protocol server for interacting with Unblu de
 site_url: "https://detailobsessed.github.io/unblu-mcp"
 repo_url: "https://github.com/detailobsessed/unblu-mcp"
 repo_name: "detailobsessed/unblu-mcp"
-site_dir: "site"
+site_dir: site
 watch: [mkdocs.yml, README.md, CONTRIBUTING.md, CHANGELOG.md, src/unblu_mcp]
 copyright: Copyright &copy; 2025 Ismar Iljazovic
 edit_uri: edit/main/docs/

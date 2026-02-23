@@ -10,8 +10,14 @@
 /build/
 /dist/
 
+# secrets
+.env
+.env.*
+!.env.example
+
 # tools
 .coverage*
+.testmondata*
 /.pdm-build/
 /htmlcov/
 /site/
