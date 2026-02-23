@@ -14,14 +14,14 @@ SWAGGER_PATH = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.jso
 @pytest.fixture
 def policy() -> dict:
     """Load the default policy."""
-    with POLICY_PATH.open() as f:
+    with POLICY_PATH.open(encoding="utf-8") as f:
         return json.load(f)
 
 
 @pytest.fixture
 def all_operation_ids() -> list[str]:
     """Get all operation IDs from swagger.json."""
-    with SWAGGER_PATH.open() as f:
+    with SWAGGER_PATH.open(encoding="utf-8") as f:
         swagger = json.load(f)
 
     operation_ids = []

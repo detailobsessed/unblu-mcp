@@ -495,7 +495,8 @@ class TestEunomiaIntegration:
                 "name": "test-policy",
                 "default_effect": "allow",
                 "rules": [],
-            })
+            }),
+            encoding="utf-8",
         )
 
         spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
@@ -691,3 +692,418 @@ class TestToolErrorHandling:
         """
         result = await server_with_tools.call_tool("find_operation", {"query": "accounts", "include_schema": False, "limit": 1})
         assert result is not None
+
+
+class TestCuratedToolsCoverage:
+    """Coverage tests for all curated tools — success and error paths."""
+
+    @pytest.fixture
+    def srv(self) -> FastMCP:
+        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
+        return create_server(spec_path=spec_path)
+
+    def _mock(self, status: int, body: object) -> MagicMock:
+        return MagicMock(return_value=httpx.Response(status, json=body))
+
+    # ------------------------------------------------------------------
+    # get_current_account
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_get_current_account_success(self, srv: FastMCP) -> None:
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json={"id": "a1", "name": "Acme"})):
+            result = await srv.call_tool("get_current_account", {})
+        assert result.structured_content is not None
+        assert result.structured_content["id"] == "a1"
+        assert result.structured_content["name"] == "Acme"
+
+    @pytest.mark.anyio
+    async def test_get_current_account_error_raises(self, srv: FastMCP) -> None:
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(401, json={"error": "unauthorized"})),
+            pytest.raises(McpError, match=r"UNBLU_BASE_URL"),
+        ):
+            await srv.call_tool("get_current_account", {})
+
+    # ------------------------------------------------------------------
+    # search_conversations
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_search_conversations_with_filters(self, srv: FastMCP) -> None:
+        body = {"items": [{"id": "c1", "state": "ACTIVE"}], "offset": 0, "limit": 25, "total": 1}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_conversations", {"status": "ACTIVE", "topic": "help"})
+        assert result.structured_content is not None
+        assert "items" in result.structured_content
+
+    @pytest.mark.anyio
+    async def test_search_conversations_empty(self, srv: FastMCP) -> None:
+        body = {"items": [], "offset": 0, "limit": 25, "total": 0}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_conversations", {})
+        assert result.structured_content is not None
+        assert result.structured_content["items"] == []
+
+    # ------------------------------------------------------------------
+    # assign_conversation
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_assign_conversation_success(self, srv: FastMCP) -> None:
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json={})):
+            result = await srv.call_tool(
+                "assign_conversation",
+                {"conversation_id": "c1", "assignee_person_id": "p1"},
+            )
+        data = result.structured_content
+        assert data is not None
+        assert data["success"] is True
+        assert "c1" in data["message"]
+
+    @pytest.mark.anyio
+    async def test_assign_conversation_error_raises(self, srv: FastMCP) -> None:
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(404, json={"error": "not found"})),
+            pytest.raises(McpError, match=r"assign"),
+        ):
+            await srv.call_tool("assign_conversation", {"conversation_id": "bad", "assignee_person_id": "p1"})
+
+    # ------------------------------------------------------------------
+    # end_conversation
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_end_conversation_success(self, srv: FastMCP) -> None:
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json={})):
+            result = await srv.call_tool("end_conversation", {"conversation_id": "c1"})
+        data = result.structured_content
+        assert data is not None
+        assert data["success"] is True
+        assert "ended" in data["message"].lower()
+
+    @pytest.mark.anyio
+    async def test_end_conversation_error_raises(self, srv: FastMCP) -> None:
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(400, json={"error": "bad state"})),
+            pytest.raises(McpError, match=r"end conversation"),
+        ):
+            await srv.call_tool("end_conversation", {"conversation_id": "bad"})
+
+    # ------------------------------------------------------------------
+    # search_persons
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_search_persons_generic(self, srv: FastMCP) -> None:
+        body = {"items": [{"id": "p1", "displayName": "Alice", "personType": "AGENT"}], "offset": 0, "limit": 25, "total": 1}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_persons", {"query": "alice"})
+        assert result.structured_content is not None
+        items = result.structured_content["items"]
+        assert len(items) == 1
+        assert items[0]["id"] == "p1"
+
+    @pytest.mark.anyio
+    async def test_search_persons_by_agent_type(self, srv: FastMCP) -> None:
+        body = {"items": [], "offset": 0, "limit": 25, "total": 0}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_persons", {"person_type": "AGENT"})
+        assert result.structured_content is not None
+        assert result.structured_content["items"] == []
+
+    @pytest.mark.anyio
+    async def test_search_persons_error_raises(self, srv: FastMCP) -> None:
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(500, json={"error": "server error"})),
+            pytest.raises(McpError, match=r"Person search failed"),
+        ):
+            await srv.call_tool("search_persons", {})
+
+    # ------------------------------------------------------------------
+    # get_person — UUID path
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_get_person_by_uuid_success(self, srv: FastMCP) -> None:
+        person = {"id": "a1b2c3d4-1234-1234-1234-a1b2c3d4e5f6", "displayName": "Alice", "personType": "AGENT"}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=person)):
+            result = await srv.call_tool("get_person", {"identifier": "a1b2c3d4-1234-1234-1234-a1b2c3d4e5f6"})
+        assert result.structured_content is not None
+
+    @pytest.mark.anyio
+    async def test_get_person_by_uuid_not_found(self, srv: FastMCP) -> None:
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(404, json={"error": "not found"})),
+            pytest.raises(McpError, match=r"search_persons"),
+        ):
+            await srv.call_tool("get_person", {"identifier": "a1b2c3d4-1234-1234-1234-a1b2c3d4e5f6"})
+
+    @pytest.mark.anyio
+    async def test_get_person_by_email_single_match(self, srv: FastMCP) -> None:
+        body = {"items": [{"id": "p1", "displayName": "Alice", "email": "alice@example.com"}], "offset": 0, "limit": 5, "total": 1}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("get_person", {"identifier": "alice@example.com"})
+        assert result.structured_content is not None
+
+    @pytest.mark.anyio
+    async def test_get_person_by_email_not_found(self, srv: FastMCP) -> None:
+        body = {"items": [], "offset": 0, "limit": 5, "total": 0}
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)),
+            pytest.raises(McpError, match=r"search_persons"),
+        ):
+            await srv.call_tool("get_person", {"identifier": "ghost@example.com"})
+
+    @pytest.mark.anyio
+    async def test_get_person_by_name_not_found(self, srv: FastMCP) -> None:
+        body = {"items": [], "offset": 0, "limit": 10, "total": 0}
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)),
+            pytest.raises(McpError, match=r"search_persons"),
+        ):
+            await srv.call_tool("get_person", {"identifier": "Nobody"})
+
+    # ------------------------------------------------------------------
+    # search_users
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_search_users_success(self, srv: FastMCP) -> None:
+        body = {"items": [{"id": "u1", "username": "bob", "displayName": "Bob"}], "offset": 0, "limit": 25, "total": 1}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_users", {"query": "bob"})
+        assert result.structured_content is not None
+        items = result.structured_content["items"]
+        assert len(items) == 1
+
+    @pytest.mark.anyio
+    async def test_search_users_error_raises(self, srv: FastMCP) -> None:
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(500, json={"error": "err"})),
+            pytest.raises(McpError, match=r"User search failed"),
+        ):
+            await srv.call_tool("search_users", {})
+
+    # ------------------------------------------------------------------
+    # get_user — UUID and email paths
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_get_user_by_uuid_success(self, srv: FastMCP) -> None:
+        user = {"id": "a1b2c3d4-1234-1234-1234-a1b2c3d4e5f6", "username": "alice", "displayName": "Alice"}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=user)):
+            result = await srv.call_tool("get_user", {"identifier": "a1b2c3d4-1234-1234-1234-a1b2c3d4e5f6"})
+        assert result.structured_content is not None
+        assert result.structured_content["id"] == "a1b2c3d4-1234-1234-1234-a1b2c3d4e5f6"
+
+    @pytest.mark.anyio
+    async def test_get_user_by_uuid_not_found(self, srv: FastMCP) -> None:
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(404, json={"error": "not found"})),
+            pytest.raises(McpError, match=r"search_users"),
+        ):
+            await srv.call_tool("get_user", {"identifier": "a1b2c3d4-1234-1234-1234-a1b2c3d4e5f6"})
+
+    @pytest.mark.anyio
+    async def test_get_user_by_email_success(self, srv: FastMCP) -> None:
+        body = {"items": [{"id": "u1", "username": "bob", "email": "bob@example.com"}], "offset": 0, "limit": 5, "total": 1}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("get_user", {"identifier": "bob@example.com"})
+        assert result.structured_content is not None
+        assert result.structured_content["id"] == "u1"
+
+    @pytest.mark.anyio
+    async def test_get_user_by_email_not_found(self, srv: FastMCP) -> None:
+        body = {"items": [], "offset": 0, "limit": 5, "total": 0}
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)),
+            pytest.raises(McpError, match=r"search_users"),
+        ):
+            await srv.call_tool("get_user", {"identifier": "ghost@example.com"})
+
+    # ------------------------------------------------------------------
+    # check_agent_availability
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_check_agent_availability_success(self, srv: FastMCP) -> None:
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json={"agentAvailability": "AVAILABLE"})):
+            result = await srv.call_tool("check_agent_availability", {})
+        data = result.structured_content
+        assert data is not None
+        assert data["availability"] == "AVAILABLE"
+
+    @pytest.mark.anyio
+    async def test_check_agent_availability_with_named_area(self, srv: FastMCP) -> None:
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json={"agentAvailability": "BUSY"})):
+            result = await srv.call_tool("check_agent_availability", {"named_area_site_id": "site-1"})
+        data = result.structured_content
+        assert data is not None
+        assert data["named_area_site_id"] == "site-1"
+
+    @pytest.mark.anyio
+    async def test_check_agent_availability_error_raises(self, srv: FastMCP) -> None:
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(500, json={"error": "err"})),
+            pytest.raises(McpError, match=r"agent availability"),
+        ):
+            await srv.call_tool("check_agent_availability", {})
+
+    # ------------------------------------------------------------------
+    # search_named_areas
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_search_named_areas_success(self, srv: FastMCP) -> None:
+        body = {"items": [{"id": "na1", "name": "Support", "siteId": "s1"}], "offset": 0, "limit": 25, "total": 1}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_named_areas", {"query": "support"})
+        assert result.structured_content is not None
+        named_area_items = result.structured_content["data"]["items"]
+        assert named_area_items[0]["id"] == "na1"
+        assert named_area_items[0]["name"] == "Support"
+
+    @pytest.mark.anyio
+    async def test_search_named_areas_error_raises(self, srv: FastMCP) -> None:
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(500, json={"error": "err"})),
+            pytest.raises(McpError, match=r"Named area search failed"),
+        ):
+            await srv.call_tool("search_named_areas", {})
+
+    # ------------------------------------------------------------------
+    # execute_operation — offset/limit and pagination
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_execute_operation_with_offset_limit(self, srv: FastMCP) -> None:
+        resp = {"items": [{"id": "x"}], "offset": 10, "limit": 5, "total": 100, "hasMoreItems": True, "nextOffset": 15}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=resp)):
+            result = await srv.call_tool(
+                "execute_operation",
+                {"operation_id": "conversationsSearch", "offset": 10, "limit": 5},
+            )
+        assert result.structured_content is not None
+        assert result.structured_content["has_more"] is True
+        assert result.structured_content["next_offset"] is not None
+
+    @pytest.mark.anyio
+    async def test_execute_operation_get_with_offset_limit(self, srv: FastMCP) -> None:
+        resp = {"id": "a1", "name": "Acme"}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=resp)):
+            result = await srv.call_tool(
+                "execute_operation",
+                {"operation_id": "accountsRead", "path_params": {"accountId": "a1"}, "offset": 0, "limit": 10},
+            )
+        assert result.structured_content is not None
+
+    # ------------------------------------------------------------------
+    # get_conversation — success path
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_get_conversation_success(self, srv: FastMCP) -> None:
+        conv = {
+            "id": "c1",
+            "topic": "Help request",
+            "state": "ACTIVE",
+            "creationTimestamp": 1700000000000,
+            "endTimestamp": None,
+            "assigneePerson": {"personId": "p1"},
+            "participants": [{"personId": "p1", "participationType": "AGENT", "state": "ACTIVE", "hidden": False}],
+            "initialEngagementType": "CHAT",
+            "sourceUrl": "https://example.com",
+            "awaitedPersonType": "AGENT",
+        }
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=conv)):
+            result = await srv.call_tool("get_conversation", {"conversation_id": "c1"})
+        data = result.structured_content
+        assert data is not None
+        assert data["id"] == "c1"
+        assert data["state"] == "ACTIVE"
+        assert len(data["participants"]) == 1
+
+    # ------------------------------------------------------------------
+    # search_persons — VISITOR and BOT type branches + pagination
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_search_persons_visitor_type(self, srv: FastMCP) -> None:
+        body = {"items": [], "offset": 0, "limit": 25, "total": 0}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_persons", {"person_type": "VISITOR"})
+        assert result.structured_content is not None
+
+    @pytest.mark.anyio
+    async def test_search_persons_bot_type(self, srv: FastMCP) -> None:
+        body = {"items": [], "offset": 0, "limit": 25, "total": 0}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_persons", {"person_type": "BOT"})
+        assert result.structured_content is not None
+
+    @pytest.mark.anyio
+    async def test_search_persons_paginated(self, srv: FastMCP) -> None:
+        body = {"items": [{"id": "p1"}], "offset": 0, "limit": 5, "total": 100, "hasMoreItems": True, "nextOffset": 5}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_persons", {"limit": 5})
+        data = result.structured_content
+        assert data is not None
+        assert data["has_more"] is True
+        assert data["next_offset"] == 5
+        assert "search_persons(offset=5)" in data["next_steps"][-1]
+
+    # ------------------------------------------------------------------
+    # search_users — pagination has_more branch
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_search_users_paginated(self, srv: FastMCP) -> None:
+        body = {"items": [{"id": "u1"}], "offset": 0, "limit": 5, "total": 100, "hasMoreItems": True, "nextOffset": 5}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_users", {"limit": 5})
+        data = result.structured_content
+        assert data is not None
+        assert data["has_more"] is True
+        assert "search_users(offset=5)" in data["next_steps"][-1]
+
+    # ------------------------------------------------------------------
+    # get_user — non-404 client error paths
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_get_user_uuid_client_error_raises(self, srv: FastMCP) -> None:
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(500, json={"error": "server error"})),
+            pytest.raises(McpError, match=r"Failed to fetch user"),
+        ):
+            await srv.call_tool("get_user", {"identifier": "a1b2c3d4-1234-1234-1234-a1b2c3d4e5f6"})
+
+    @pytest.mark.anyio
+    async def test_get_user_username_client_error_raises(self, srv: FastMCP) -> None:
+        with (
+            patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(500, json={"error": "server error"})),
+            pytest.raises(McpError, match=r"Failed to fetch user"),
+        ):
+            await srv.call_tool("get_user", {"identifier": "problemuser"})
+
+    # ------------------------------------------------------------------
+    # search_named_areas — pagination has_more branch
+    # ------------------------------------------------------------------
+
+    @pytest.mark.anyio
+    async def test_search_named_areas_paginated(self, srv: FastMCP) -> None:
+        body = {
+            "items": [{"id": "na1", "name": "Support"}],
+            "offset": 0,
+            "limit": 5,
+            "total": 20,
+            "hasMoreItems": True,
+            "nextOffset": 5,
+        }
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_named_areas", {"limit": 5})
+        data = result.structured_content
+        assert data is not None
+        assert data["has_more"] is True
+        assert "search_named_areas(offset=5)" in data["next_steps"][-1]

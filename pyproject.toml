@@ -203,6 +203,7 @@ markers = [
 ]
 filterwarnings = [
     "error",
+    "ignore::EncodingWarning:eunomia_mcp",
 ]
 
 [tool.coverage.run]

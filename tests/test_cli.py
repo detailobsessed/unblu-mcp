@@ -95,12 +95,15 @@ def test_get_provider_k8s(tmp_path: Path) -> None:
 
     # Create a test config file with dev environment
     config_file = tmp_path / "k8s_envs.yaml"
-    config_file.write_text("""
+    config_file.write_text(
+        """
 environments:
   dev:
     local_port: 8084
     namespace: unblu-dev
-""")
+""",
+        encoding="utf-8",
+    )
     provider = _get_provider("k8s", "dev", str(config_file))
     assert isinstance(provider, K8sConnectionProvider)
     assert provider.environment == "dev"
@@ -113,12 +116,15 @@ def test_get_provider_k8s_custom_environment(tmp_path: Path) -> None:
 
     # Create a test config file with prod environment
     config_file = tmp_path / "k8s_envs.yaml"
-    config_file.write_text("""
+    config_file.write_text(
+        """
 environments:
   prod:
     local_port: 8086
     namespace: unblu-prod
-""")
+""",
+        encoding="utf-8",
+    )
     provider = _get_provider("k8s", "prod", str(config_file))
     assert isinstance(provider, K8sConnectionProvider)
     assert provider.environment == "prod"
@@ -130,7 +136,8 @@ def test_get_provider_k8s_with_config_file(tmp_path: Path) -> None:
     from unblu_mcp._internal.providers_k8s import K8sConnectionProvider
 
     config_file = tmp_path / "k8s_envs.yaml"
-    config_file.write_text("""
+    config_file.write_text(
+        """
 environments:
   custom-env:
     local_port: 9999
@@ -138,7 +145,9 @@ environments:
     service: my-service
     service_port: 8080
     api_path: /api/v1
-""")
+""",
+        encoding="utf-8",
+    )
     provider = _get_provider("k8s", "custom-env", str(config_file))
     assert isinstance(provider, K8sConnectionProvider)
     assert provider.environment == "custom-env"
@@ -150,7 +159,7 @@ def test_get_provider_k8s_with_empty_config_file(tmp_path: Path) -> None:
     from unblu_mcp._internal.cli import _get_provider
 
     config_file = tmp_path / "empty.yaml"
-    config_file.write_text("environments: {}")
+    config_file.write_text("environments: {}", encoding="utf-8")
 
     with pytest.raises(ValueError, match="No environments found"):
         _get_provider("k8s", "dev", str(config_file))
