@@ -2,7 +2,7 @@
 name: Bug report
 about: Create a bug report to help us improve.
 title: "bug: "
-labels: unconfirmed
+labels: bug
 assignees: [detailobsessed]
 ---
 
@@ -46,14 +46,11 @@ PASTE TRACEBACK HERE
 <!-- Please provide a clear and concise description of what you expected to happen. -->
 
 ### Environment information
-<!-- Please run the following command in your repository and paste its output below it,
-     redacting sensitive information. -->
+<!-- Please paste the output of `uv --version && python --version` and your OS below. -->
 
-```bash
-unblu-mcp --debug-info  # | xclip -selection clipboard
 ```
-
-PASTE MARKDOWN OUTPUT HERE
+PASTE VERSION INFO HERE
+```
 
 ### Additional context
 <!-- Add any other relevant context about the problem here,

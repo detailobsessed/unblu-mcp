@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # Get current project version from Git tags or changelog.
 
 import re
@@ -14,7 +15,7 @@ from pdm.backend.hooks.version import (  # ty: ignore[unresolved-import]
 _root = Path(__file__).parent.parent
 _changelog = _root / "CHANGELOG.md"
 _changelog_version_re = re.compile(r"^## \[(\d+\.\d+\.\d+)\].*$")
-_default_scm_version = SCMVersion(Version("0.0.0"), None, False, None, None)  # noqa: FBT003
+_default_scm_version = SCMVersion(Version("0.0.0"), None, False, None, None)
 
 
 def get_version() -> str:

@@ -6,8 +6,8 @@ from unittest.mock import MagicMock, patch
 
 import httpx
 import pytest
-from fastmcp import FastMCP
-from fastmcp.exceptions import ToolError
+from fastmcp import FastMCP  # noqa: TC002
+from mcp.shared.exceptions import McpError
 
 from unblu_mcp._internal.server import (
     OperationInfo,
@@ -26,7 +26,7 @@ def swagger_spec() -> dict:
     spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
     if not spec_path.exists():
         pytest.skip("swagger.json not found")
-    with open(spec_path, encoding="utf-8") as f:
+    with Path(spec_path).open(encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -70,9 +70,7 @@ class TestUnbluAPIRegistry:
         assert len(registry.operations) > 0
 
         # Check a known operation exists
-        assert "conversationsGetById" in registry.operations or any(
-            "conversation" in op_id.lower() for op_id in registry.operations
-        )
+        assert "conversationsGetById" in registry.operations or any("conversation" in op_id.lower() for op_id in registry.operations)
 
     def test_list_operations_for_service(self, registry: UnbluAPIRegistry) -> None:
         """list_operations returns operations for a specific service."""
@@ -105,7 +103,7 @@ class TestUnbluAPIRegistry:
         assert schema is not None
         assert isinstance(schema, OperationSchema)
         assert schema.operation_id == op_id
-        assert schema.method in ("GET", "POST", "PUT", "DELETE", "PATCH")
+        assert schema.method in {"GET", "POST", "PUT", "DELETE", "PATCH"}
 
     def test_get_operation_schema_unknown(self, registry: UnbluAPIRegistry) -> None:
         """get_operation_schema returns None for unknown operation."""
@@ -127,9 +125,11 @@ class TestMCPServer:
         assert server is not None
         assert server.name == "unblu-mcp"
 
-    def test_server_has_tools(self, server: FastMCP) -> None:
+    @pytest.mark.anyio
+    async def test_server_has_tools(self, server: FastMCP) -> None:
         """Server has the expected tools."""
-        tools = server._tool_manager._tools
+        tools = await server.list_tools()
+        tool_names = [t.name for t in tools]
         expected_tools = [
             "list_services",
             "list_operations",
@@ -138,11 +138,12 @@ class TestMCPServer:
             "call_api",
         ]
         for tool_name in expected_tools:
-            assert tool_name in tools, f"Missing tool: {tool_name}"
+            assert tool_name in tool_names, f"Missing tool: {tool_name}"
 
-    def test_server_tool_count(self, server: FastMCP) -> None:
+    @pytest.mark.anyio
+    async def test_server_tool_count(self, server: FastMCP) -> None:
         """Server has exactly 5 tools (progressive disclosure pattern)."""
-        tools = server._tool_manager._tools
+        tools = await server.list_tools()
         assert len(tools) == 5
 
 
@@ -364,7 +365,8 @@ class TestLifespanBehavior:
                 self.teardown_called = False
 
             async def setup(self) -> None:
-                raise RuntimeError("Setup failed")
+                msg = "Setup failed"
+                raise RuntimeError(msg)
 
             async def teardown(self) -> None:
                 self.teardown_called = True
@@ -439,14 +441,12 @@ class TestEunomiaIntegration:
         # Create a minimal policy file
         policy_file = tmp_path / "test_policy.json"
         policy_file.write_text(
-            json.dumps(
-                {
-                    "version": "1.0",
-                    "name": "test-policy",
-                    "default_effect": "allow",
-                    "rules": [],
-                }
-            )
+            json.dumps({
+                "version": "1.0",
+                "name": "test-policy",
+                "default_effect": "allow",
+                "rules": [],
+            })
         )
 
         spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
@@ -512,37 +512,31 @@ class TestToolErrorHandling:
     @pytest.mark.anyio
     async def test_list_operations_unknown_service_raises_tool_error(self, server_with_tools: FastMCP) -> None:
         """list_operations raises ToolError for unknown service."""
-        tool = server_with_tools._tool_manager._tools["list_operations"]
-        with pytest.raises(ToolError, match=r"Service 'NonExistentService' not found"):
-            await tool.fn(service="NonExistentService")  # ty: ignore[unresolved-attribute]
+        with pytest.raises(McpError, match=r"Service 'NonExistentService' not found"):
+            await server_with_tools.call_tool("list_operations", {"service": "NonExistentService"})
 
     @pytest.mark.anyio
     async def test_get_operation_schema_unknown_raises_tool_error(self, server_with_tools: FastMCP) -> None:
         """get_operation_schema raises ToolError for unknown operation."""
-        tool = server_with_tools._tool_manager._tools["get_operation_schema"]
-        with pytest.raises(ToolError, match=r"Operation 'nonExistentOp' not found"):
-            await tool.fn(operation_id="nonExistentOp")  # ty: ignore[unresolved-attribute]
+        with pytest.raises(McpError, match=r"Operation 'nonExistentOp' not found"):
+            await server_with_tools.call_tool("get_operation_schema", {"operation_id": "nonExistentOp"})
 
     @pytest.mark.anyio
     async def test_call_api_unknown_operation_raises_tool_error(self, server_with_tools: FastMCP) -> None:
         """call_api raises ToolError for unknown operation."""
-        tool = server_with_tools._tool_manager._tools["call_api"]
-        with pytest.raises(ToolError, match=r"Operation 'nonExistentOp' not found"):
-            await tool.fn(operation_id="nonExistentOp")  # ty: ignore[unresolved-attribute]
+        with pytest.raises(McpError, match=r"Operation 'nonExistentOp' not found"):
+            await server_with_tools.call_tool("call_api", {"operation_id": "nonExistentOp"})
 
     @pytest.mark.anyio
     async def test_call_api_missing_path_params_raises_tool_error(self, server_with_tools: FastMCP) -> None:
         """call_api raises ToolError when required path params are missing."""
-        tool = server_with_tools._tool_manager._tools["call_api"]
         # accountsDelete requires accountId path param
-        with pytest.raises(ToolError, match=r"Missing required path parameters"):
-            await tool.fn(operation_id="accountsDelete", path_params=None)  # ty: ignore[unresolved-attribute]
+        with pytest.raises(McpError, match=r"Missing required path parameters"):
+            await server_with_tools.call_tool("call_api", {"operation_id": "accountsDelete", "path_params": None})
 
     @pytest.mark.anyio
     async def test_call_api_request_error_raises_tool_error(self, server_with_tools: FastMCP) -> None:
         """call_api raises ToolError on httpx.RequestError."""
-        tool = server_with_tools._tool_manager._tools["call_api"]
-
         # Mock the httpx client to raise a connection error
         # accountsCreate has no path params, so it will reach the HTTP request
         with (
@@ -551,6 +545,6 @@ class TestToolErrorHandling:
                 "request",
                 side_effect=httpx.ConnectError("Connection refused"),
             ),
-            pytest.raises(ToolError, match=r"API request failed"),
+            pytest.raises(McpError, match=r"API request failed"),
         ):
-            await tool.fn(operation_id="accountsCreate")  # ty: ignore[unresolved-attribute]
+            await server_with_tools.call_tool("call_api", {"operation_id": "accountsCreate"})

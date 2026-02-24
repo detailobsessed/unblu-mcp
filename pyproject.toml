@@ -9,7 +9,7 @@ authors = [{name = "Ismar Iljazovic", email = "ismar@gmail.com"}]
 license = "ISC"
 license-files = ["LICENSE"]
 readme = "README.md"
-requires-python = ">=3.13"
+requires-python = ">=3.14"
 keywords = ["mcp", "model-context-protocol", "unblu", "api", "llm", "ai", "chatbot", "customer-service"]
 version = "0.5.2"
 classifiers = [
@@ -18,7 +18,6 @@ classifiers = [
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.13",
     "Programming Language :: Python :: 3.14",
     "Programming Language :: Python :: 3.15",
     "Topic :: Documentation",
@@ -30,7 +29,6 @@ dependencies = [
     "fastmcp>=2.14.1",
     "httpx>=0.27.0",
     "pydantic>=2.0.0",
-    "prek",
 ]
 
 [project.urls]
@@ -62,18 +60,15 @@ ci = [
     "pytest-asyncio>=0.24",
     "pytest-cov>=6",
     "pytest-randomly>=3.15",
-    "pytest-xdist>=3.5",
+    "ty>=0.0.14",
+    "poethepoet>=0.41",
     "respx>=0.21",
-    "ty>=0.0.1a20",
-    "poethepoet>=0.32",
-    "bandit>=1.8",
-    "vulture>=2.13",
-    "pyupgrade>=3.19",
     "pytest-subprocess>=1.5.3",
     "eunomia-mcp>=0.3.10",  # Optional dep needed for type checking
 ]
 local = [
-    "prek>=0.2.20",
+    "prek>=0.3.1",
+    "pytest-testmon>=2.2",
 ]
 docs = [
     "markdown-callouts>=0.4",
@@ -91,32 +86,156 @@ docs = [
     "tomli; python_version < '3.11'",
 ]
 
-[tool.pytest.ini_options]
-asyncio_mode = "auto"
-
 [tool.uv]
 default-groups = ["maintain", "ci", "docs", "local"]
-package = true
+
+[tool.ruff]
+target-version = "py314"
+line-length = 140
+preview = true
+
+[tool.ruff.lint]
+select = [
+    # Core — universal baseline (ruff defaults + pycodestyle warnings)
+    "E",    # pycodestyle errors
+    "W",    # pycodestyle warnings
+    "F",    # Pyflakes
+
+    # Modern Python — enforce current idioms
+    "UP",   # pyupgrade — use modern syntax (match, type unions, etc.)
+    "I",    # isort — deterministic import ordering
+    "FA",   # flake8-future-annotations — `from __future__ import annotations`
+
+    # Code quality — catch bugs and enforce clean patterns
+    "A",    # flake8-builtins — prevent shadowing builtins (id, type, list)
+    "B",    # flake8-bugbear — common bugs and design issues
+    "SIM",  # flake8-simplify — simplifiable constructs
+    "C4",   # flake8-comprehensions — better comprehensions
+    "PIE",  # flake8-pie — misc quality improvements
+    "RET",  # flake8-return — consistent return statements
+    "RSE",  # flake8-raise — raise best practices
+    "ISC",  # flake8-implicit-str-concat — catch missing commas in collections
+    "RUF",  # Ruff-specific rules
+    "FURB", # refurb — modernise and simplify code
+    "FLY",  # flynt — prefer f-strings over .format() and %
+    "PGH",  # pygrep-hooks — catch bare `# type: ignore`, eval(), etc.
+
+    # Import hygiene
+    "ICN",  # flake8-import-conventions — enforce standard aliases (np, pd)
+    "TID",  # flake8-tidy-imports — ban relative imports, enforce absolute
+    "TC",   # flake8-type-checking — move imports behind TYPE_CHECKING
+
+    # Naming — currently disabled; enable once existing code conforms
+    # "N",  # pep8-naming — PEP 8 naming conventions
+
+    # Correctness
+    "DTZ",  # flake8-datetimez — enforce timezone-aware datetimes
+    "PTH",  # flake8-use-pathlib — prefer pathlib over os.path
+
+    # Error messages
+    "EM",   # flake8-errmsg — variables in exception constructors (better tracebacks)
+
+    # Pylint — uses default thresholds; do not inflate to hide violations
+    "PLC",  # pylint conventions
+    "PLE",  # pylint errors
+    "PLR",  # pylint refactor (too-many-args, too-many-branches, etc.)
+    "PLW",  # pylint warnings
+
+    # Performance
+    "PERF", # Perflint — performance anti-patterns
+
+    # Security
+    "S",    # flake8-bandit — security issues
+
+    # Testing
+    "PT",   # flake8-pytest-style — consistent pytest idioms
+
+    # Error handling
+    "TRY",  # tryceratops — exception handling best practices
+    "LOG",  # flake8-logging — logging best practices
+
+    # Housekeeping
+    "ARG",  # flake8-unused-arguments
+    "ERA",  # eradicate — commented-out code
+    "T20",  # flake8-print — use logging instead of print()
+]
+ignore = [
+    "TRY003",  # Overly strict — forces custom exception classes for every error message
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/unblu_mcp/_internal/debug.py" = ["T201"]  # intentional debug prints
+"scripts/**" = ["T201", "PLC2701"]  # scripts use print and private imports intentionally
+"tests/**" = [
+    "S101", "S404", "S603", "S607",  # Allow assert and subprocess in tests
+    "T201",       # Allow print in tests
+    "PLR6301",    # Test methods don't use self (pytest classes)
+    "PLR2004",    # Magic values in assertions are fine
+    "PLC0415",    # Lazy imports in test functions are idiomatic
+    "PLC2701",    # Private name imports for testing internals
+    "ARG002",     # Unused method arguments (fixtures)
+    "DTZ005",     # Naive datetime in tests is fine
+    "PLR0904",    # Test classes naturally have many test methods
+]
+
+[tool.ruff.lint.pylint]
+# All values are pylint defaults — do not inflate to hide violations.
+
+[tool.ruff.lint.flake8-pytest-style]
+fixture-parentheses = false
+mark-parentheses = false
+
+[tool.ruff.lint.isort]
+known-first-party = ["unblu_mcp"]
+
+[tool.ruff.format]
+docstring-code-format = true
+docstring-code-line-length = 100
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-v"
+asyncio_mode = "auto"
+markers = [
+    "slow: marks tests as slow (deselect with '-m \"not slow\"')",
+]
+filterwarnings = [
+    "error",
+]
+
+[tool.coverage.run]
+branch = true
+parallel = true
+source = ["src/"]
+
+[tool.coverage.report]
+precision = 2
+omit = ["src/*/__init__.py"]
+exclude_lines = ["pragma: no cover", "if TYPE_CHECKING", "if __name__ == .__main__.:"]
+
+[tool.coverage.json]
+output = "htmlcov/coverage.json"
+
+[tool.ty.environment]
+python-version = "3.14"
+python = ".venv"
 
 [tool.poe.tasks]
 # Quality checks
-lint = "ruff check src tests --config config/ruff.toml"
-format = "ruff format src tests --config config/ruff.toml"
-typecheck = "ty check src tests"
-security = "bandit -r src -c config/bandit.toml"
-deadcode = "vulture src tests --min-confidence 80"
-upgrade = "pyupgrade --py314-plus src/**/*.py tests/**/*.py"
+lint = "ruff check ."
+format = "ruff format ."
+typecheck = "ty check ."
 
 # Testing
-test = "pytest tests -c config/pytest.ini"
-test-cov = "pytest tests -c config/pytest.ini --cov=src --cov-report=term-missing --cov-report=html"
+test = "pytest -m 'not slow'"
+test-affected = "pytest --testmon --no-cov"
+test-all = "pytest"
+test-cov = "pytest --cov --cov-report=term-missing --cov-report=html"
 
 # Combined tasks
-check = ["lint", "typecheck", "security", "deadcode"]
-fix = ["format", "upgrade"]
-
-# Run pre-commit hooks
-prek = "prek run --all-files"
+check.parallel = ["lint", "typecheck"]
+check.ignore_fail = "return_non_zero"
+fix = ["lint --fix", "format"]
 
 # MCP
 inspect = "DANGEROUSLY_OMIT_AUTH=true npx -y @modelcontextprotocol/inspector uv run unblu-mcp"
@@ -132,10 +251,20 @@ setup = "uv sync --all-extras --dev"
 # VSCode configuration
 vscode = "cp -r config/vscode/.vscode ."
 
-# GitHub utilities
-releases = "gh release list --limit 10"
+
+# Template utilities
+check-template = "bash scripts/check-template-update.sh"
+update-template = { shell = "copier update --trust . --skip-answered --defaults && uv sync --upgrade && prek autoupdate && echo '  ✓ Dependencies upgraded and hook versions updated'" }
+
+# Git utilities
 tags = "sh -c 'git fetch --tags && git tag --sort=-version:refname'"
+
+# GitHub utilities
+# actions-up: https://github.com/azat-io/actions-up
+actionsup = "actions-up"
+releases = "gh release list --limit 10"
 runs = "gh run list --limit 10"
+checks = "gh pr checks --watch"
 watch = "gh run watch"
 
 [tool.semantic_release]
@@ -151,6 +280,7 @@ major_on_zero = false
 [tool.semantic_release.changelog]
 template_dir = "templates"
 changelog_file = "CHANGELOG.md"
+mode = "update"
 
 [tool.semantic_release.commit_parser_options]
 allowed_tags = ["build", "chore", "ci", "deps", "docs", "feat", "fix", "perf", "refactor", "style", "test"]
