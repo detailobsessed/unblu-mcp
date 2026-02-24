@@ -169,9 +169,9 @@ class TestMCPServer:
 
     @pytest.mark.anyio
     async def test_server_tool_count(self, server: FastMCP) -> None:
-        """Server has exactly 13 curated tools."""
+        """Server has exactly 14 curated tools."""
         tools = await server.list_tools()
-        assert len(tools) == 13
+        assert len(tools) == 14
 
     @pytest.mark.anyio
     async def test_server_has_resources(self, server: FastMCP) -> None:
@@ -1107,3 +1107,51 @@ class TestCuratedToolsCoverage:
         assert data is not None
         assert data["has_more"] is True
         assert "search_named_areas(offset=5)" in data["next_steps"][-1]
+
+    @pytest.mark.anyio
+    async def test_search_persons_with_fields(self, srv: FastMCP) -> None:
+        body = {"items": [{"id": "p1", "displayName": "Alice", "personType": "AGENT"}]}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_persons", {"fields": ["id", "displayName"]})
+        data = result.structured_content
+        assert data is not None
+        items = data["items"]
+        assert len(items) == 1
+        assert items[0]["id"] == "p1"
+        assert "personType" not in items[0]
+
+    @pytest.mark.anyio
+    async def test_search_users_with_fields(self, srv: FastMCP) -> None:
+        body = {"items": [{"id": "u1", "username": "bob", "email": "bob@example.com"}]}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=body)):
+            result = await srv.call_tool("search_users", {"fields": ["id", "username"]})
+        data = result.structured_content
+        assert data is not None
+        items = data["items"]
+        assert len(items) == 1
+        assert items[0]["id"] == "u1"
+        assert "email" not in items[0]
+
+    @pytest.mark.anyio
+    async def test_get_persons_batch_success(self, srv: FastMCP) -> None:
+        uuid = "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+        person_body = {"id": uuid, "displayName": "Alice", "personType": "AGENT"}
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(200, json=person_body)):
+            result = await srv.call_tool("get_persons", {"identifiers": [uuid]})
+        data = result.structured_content
+        assert data is not None
+        assert data["total"] == 1
+        assert data["succeeded"] == 1
+        assert data["failed"] == 0
+        assert data["entries"][0]["identifier"] == uuid
+        assert data["entries"][0]["error"] is None
+
+    @pytest.mark.anyio
+    async def test_get_persons_batch_with_error(self, srv: FastMCP) -> None:
+        with patch.object(httpx.AsyncClient, "request", return_value=httpx.Response(404, json={})):
+            result = await srv.call_tool("get_persons", {"identifiers": ["bad-id@example.com"]})
+        data = result.structured_content
+        assert data is not None
+        assert data["total"] == 1
+        assert data["failed"] == 1
+        assert data["entries"][0]["error"] is not None

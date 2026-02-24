@@ -75,10 +75,15 @@ def make_id_filter(field: str, value: str) -> dict[str, Any]:
     }
 
 
-def make_enum_filter(field: str, value: str) -> dict[str, Any]:
+def make_enum_filter(
+    field: str,
+    value: str,
+    filter_type: str = "ConversationStateSearchFilter",
+    operator_type: str = "EConversationStateOperator",
+) -> dict[str, Any]:
     """Build an Unblu enum equality search filter."""
     return {
-        "$_type": "ConversationStateSearchFilter",
+        "$_type": filter_type,
         "field": field,
-        "operator": {"$_type": "EConversationStateOperator", "type": "EQUALS", "value": value},
+        "operator": {"$_type": operator_type, "type": "EQUALS", "value": value},
     }

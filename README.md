@@ -72,11 +72,12 @@ Kubernetes port-forward (auto-managed):
 | Tool | Description |
 |------|-------------|
 | `get_current_account` | Current account info — good first call to verify connectivity |
-| `search_conversations(status?, topic?, assignee_id?, limit?)` | Search conversations with filters |
+| `search_conversations(status?, topic?, assignee_id?, limit?, fields?)` | Search conversations with filters |
 | `get_conversation(conversation_id)` | Full conversation detail with participants |
-| `search_persons(query?, email?, limit?)` | Find persons (visitors, agents) |
+| `search_persons(query?, email?, limit?, fields?)` | Find persons (visitors, agents) |
 | `get_person(person_id)` | Full person detail |
-| `search_users(query?, email?, limit?)` | Find registered users |
+| `get_persons(identifiers, fields?)` | Batch-resolve up to 20 persons in parallel |
+| `search_users(query?, email?, limit?, fields?)` | Find registered users |
 | `get_user(user_id)` | Full user detail |
 | `check_agent_availability(named_area_id?)` | Check agent availability per named area |
 | `search_named_areas(query?, limit?)` | List named areas (routing targets) |

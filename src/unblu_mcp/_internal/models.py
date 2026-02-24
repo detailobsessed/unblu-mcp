@@ -98,7 +98,7 @@ class ConversationSummary(BaseModel):
 class ConversationPage(_NextSteps):
     """Paginated list of conversations."""
 
-    items: list[ConversationSummary]
+    items: list[Any]
     has_more: bool = False
     next_offset: int | None = Field(
         default=None,
@@ -124,6 +124,7 @@ class ConversationDetail(_NextSteps):
     participants: list[ConversationParticipant] = Field(default_factory=list)
     bot_participant_count: int = 0
     metadata: dict[str, Any] | None = None
+    gui_url: str | None = Field(default=None, description="Unblu admin console URL for this conversation.")
 
 
 # ---------------------------------------------------------------------------
@@ -145,7 +146,7 @@ class PersonSummary(BaseModel):
 class PersonPage(_NextSteps):
     """Paginated list of persons."""
 
-    items: list[PersonSummary]
+    items: list[Any]
     has_more: bool = False
     next_offset: int | None = Field(
         default=None,
@@ -168,6 +169,7 @@ class PersonDetail(_NextSteps):
     authorization_role: str | None = None
     source_id: str | None = None
     source_url: str | None = None
+    gui_url: str | None = Field(default=None, description="Unblu admin console URL for this person.")
 
 
 class PersonAmbiguousResult(_NextSteps):
@@ -195,7 +197,7 @@ class UserSummary(BaseModel):
 class UserPage(_NextSteps):
     """Paginated list of users."""
 
-    items: list[UserSummary]
+    items: list[Any]
     has_more: bool = False
     next_offset: int | None = Field(
         default=None,
@@ -215,6 +217,29 @@ class UserDetail(_NextSteps):
     authorization_role: str | None = None
     virtual_user: bool | None = None
     externally_managed: bool | None = None
+    gui_url: str | None = Field(default=None, description="Unblu admin console URL for this user.")
+
+
+# ---------------------------------------------------------------------------
+# Persons — batch lookup
+# ---------------------------------------------------------------------------
+
+
+class PersonBatchEntry(BaseModel):
+    """One entry in a get_persons() batch result."""
+
+    identifier: str = Field(description="The identifier that was looked up.")
+    result: PersonDetail | PersonAmbiguousResult | None = None
+    error: str | None = Field(default=None, description="Error message if the lookup failed.")
+
+
+class PersonBatchResult(_NextSteps):
+    """Result from get_persons() batch lookup."""
+
+    entries: list[PersonBatchEntry]
+    total: int = Field(description="Total number of identifiers requested.")
+    succeeded: int = Field(description="Number of successful lookups.")
+    failed: int = Field(description="Number of failed lookups (not found or error).")
 
 
 # ---------------------------------------------------------------------------
