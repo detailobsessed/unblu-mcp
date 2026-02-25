@@ -28,8 +28,10 @@ The server exposes three layers, each progressively more powerful:
 ### Installation
 
 ```bash
-uv tool install unblu-mcp
+uvx unblu-mcp
 ```
+
+Or install persistently: `uv tool install unblu-mcp`
 
 ### MCP Client Configuration
 
@@ -39,7 +41,8 @@ Direct API access with an API key:
 {
   "mcpServers": {
     "unblu": {
-      "command": "unblu-mcp",
+      "command": "uvx",
+      "args": ["unblu-mcp"],
       "env": {
         "UNBLU_BASE_URL": "https://your-instance.unblu.cloud/app/rest/v4",
         "UNBLU_API_KEY": "your-api-key"
@@ -55,8 +58,8 @@ Kubernetes port-forward (auto-managed):
 {
   "mcpServers": {
     "unblu": {
-      "command": "unblu-mcp",
-      "args": ["--provider", "k8s", "--environment", "dev"],
+      "command": "uvx",
+      "args": ["unblu-mcp", "--provider", "k8s", "--environment", "dev"],
       "env": {
         "PATH": "/Users/YOUR_USERNAME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
       }
