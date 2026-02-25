@@ -8,16 +8,17 @@ This guide covers installation and basic configuration of unblu-mcp.
 
 ## Installation
 
-This package is available on [PyPI](https://pypi.org/project/unblu-mcp/). The recommended installation method is via `uv tool install`:
+This package is available on [PyPI](https://pypi.org/project/unblu-mcp/). Run directly with `uvx` (no installation needed):
+
+```bash
+uvx unblu-mcp
+```
+
+Or install persistently so the `unblu-mcp` command is always available:
 
 ```bash
 uv tool install unblu-mcp
 ```
-
-This installs the `unblu-mcp` command to `~/.local/bin/` and avoids [cache locking issues](https://github.com/astral-sh/uv/issues/11694) that affect long-running MCP servers when using `uvx`.
-
-!!! note
-    You can also run directly via `uvx unblu-mcp` without installation, but this will block `uv cache prune` operations while the server is running.
 
 ### From source
 
@@ -35,9 +36,25 @@ Add the server to your MCP client configuration (Claude Desktop, Windsurf, etc.)
 
 The K8s provider automatically manages `kubectl port-forward` connections to your Unblu deployment. This is the most tested configuration.
 
-=== "macOS"
+=== "uvx (no install)"
 
-    `~/Library/Application Support/Claude/claude_desktop_config.json` or IDE MCP config:
+    ```json
+    {
+      "mcpServers": {
+        "unblu": {
+          "command": "uvx",
+          "args": ["unblu-mcp", "--provider", "k8s", "--environment", "dev"],
+          "env": {
+            "PATH": "/Users/YOUR_USERNAME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+          }
+        }
+      }
+    }
+    ```
+
+=== "uv tool install"
+
+    After running `uv tool install unblu-mcp`:
 
     ```json
     {
@@ -53,45 +70,49 @@ The K8s provider automatically manages `kubectl port-forward` connections to you
     }
     ```
 
-=== "Windows"
-
-    `%APPDATA%\Claude\claude_desktop_config.json`:
-
-    ```json
-    {
-      "mcpServers": {
-        "unblu": {
-          "command": "unblu-mcp",
-          "args": ["--provider", "k8s", "--environment", "dev"],
-          "env": {
-            "PATH": "C:\\Users\\YOUR_USERNAME\\.local\\bin;C:\\Program Files\\...;..."
-          }
-        }
-      }
-    }
-    ```
-
 See [Kubernetes Provider](kubernetes.md) for setting up your environments.
 
 ### With Environment Variables
 
 For direct API access without Kubernetes:
 
-```json
-{
-  "mcpServers": {
-    "unblu": {
-      "command": "unblu-mcp",
-      "args": [],
-      "env": {
-        "PATH": "/Users/YOUR_USERNAME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
-        "UNBLU_BASE_URL": "https://your-instance.unblu.cloud/app/rest/v4",
-        "UNBLU_API_KEY": "your-api-key"
+=== "uvx (no install)"
+
+    ```json
+    {
+      "mcpServers": {
+        "unblu": {
+          "command": "uvx",
+          "args": ["unblu-mcp"],
+          "env": {
+            "PATH": "/Users/YOUR_USERNAME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+            "UNBLU_BASE_URL": "https://your-instance.unblu.cloud/app/rest/v4",
+            "UNBLU_API_KEY": "your-api-key"
+          }
+        }
       }
     }
-  }
-}
-```
+    ```
+
+=== "uv tool install"
+
+    After running `uv tool install unblu-mcp`:
+
+    ```json
+    {
+      "mcpServers": {
+        "unblu": {
+          "command": "unblu-mcp",
+          "args": [],
+          "env": {
+            "PATH": "/Users/YOUR_USERNAME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin",
+            "UNBLU_BASE_URL": "https://your-instance.unblu.cloud/app/rest/v4",
+            "UNBLU_API_KEY": "your-api-key"
+          }
+        }
+      }
+    }
+    ```
 
 ## Environment Variables
 

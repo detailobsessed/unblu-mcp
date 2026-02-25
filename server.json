@@ -12,6 +12,7 @@
       "registryType": "pypi",
       "identifier": "unblu-mcp",
       "version": "0.7.1",
+      "runtimeHint": "uvx",
       "transport": {
         "type": "stdio"
       },
