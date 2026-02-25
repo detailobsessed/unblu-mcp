@@ -11,4 +11,4 @@ permissions:
 
 jobs:
   publish:
-    uses: detailobsessed/ci-components/.github/workflows/mcp-registry-publish-bun.yml@main
+    uses: detailobsessed/ci-components/.github/workflows/mcp-registry-publish.yml@main
