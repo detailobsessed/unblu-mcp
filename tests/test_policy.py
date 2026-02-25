@@ -14,14 +14,14 @@ SWAGGER_PATH = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.jso
 @pytest.fixture
 def policy() -> dict:
     """Load the default policy."""
-    with POLICY_PATH.open() as f:
+    with POLICY_PATH.open(encoding="utf-8") as f:
         return json.load(f)
 
 
 @pytest.fixture
 def all_operation_ids() -> list[str]:
     """Get all operation IDs from swagger.json."""
-    with SWAGGER_PATH.open() as f:
+    with SWAGGER_PATH.open(encoding="utf-8") as f:
         swagger = json.load(f)
 
     operation_ids = []
@@ -52,27 +52,42 @@ class TestPolicyStructure:
         assert "tools/list" in mcp_methods["value"]
 
     def test_policy_has_read_only_tools_rule(self, policy: dict) -> None:
-        """Policy allows read-only discovery tools."""
+        """Policy allows read-only curated tools."""
         rule = next(r for r in policy["rules"] if r["name"] == "allow-read-only-tools")
         assert rule["effect"] == "allow"
         conditions = rule["resource_conditions"]
         tool_names = next(c for c in conditions if c["path"] == "attributes.tool_name")
-        assert "list_services" in tool_names["value"]
-        assert "get_operation_schema" in tool_names["value"]
+        assert "find_operation" in tool_names["value"]
+        assert "get_current_account" in tool_names["value"]
+        assert "search_conversations" in tool_names["value"]
+        assert "get_conversation" in tool_names["value"]
+
+    def test_policy_has_mutation_tools_rule(self, policy: dict) -> None:
+        """Policy allows mutation tools (assign, end conversation)."""
+        rule = next(r for r in policy["rules"] if r["name"] == "allow-mutation-tools")
+        assert rule["effect"] == "allow"
+        conditions = rule["resource_conditions"]
+        tool_names = next(c for c in conditions if c["path"] == "attributes.tool_name")
+        assert "assign_conversation" in tool_names["value"]
+        assert "end_conversation" in tool_names["value"]
 
     def test_policy_has_read_api_rule(self, policy: dict) -> None:
-        """Policy allows read-only API calls."""
+        """Policy allows read-only execute_operation calls."""
         rule = next(r for r in policy["rules"] if r["name"] == "allow-read-api-calls")
         assert rule["effect"] == "allow"
         conditions = rule["resource_conditions"]
+        tool_cond = next(c for c in conditions if c["path"] == "attributes.tool_name")
+        assert tool_cond["value"] == "execute_operation"
         op_condition = next(c for c in conditions if c["path"] == "attributes.args.operation_id")
         assert op_condition["operator"] == "regex"
 
     def test_policy_has_deny_destructive_rule(self, policy: dict) -> None:
-        """Policy denies destructive API calls."""
+        """Policy denies destructive execute_operation calls."""
         rule = next(r for r in policy["rules"] if r["name"] == "deny-destructive-api-calls")
         assert rule["effect"] == "deny"
         conditions = rule["resource_conditions"]
+        tool_cond = next(c for c in conditions if c["path"] == "attributes.tool_name")
+        assert tool_cond["value"] == "execute_operation"
         op_condition = next(c for c in conditions if c["path"] == "attributes.args.operation_id")
         assert op_condition["operator"] == "regex"
 

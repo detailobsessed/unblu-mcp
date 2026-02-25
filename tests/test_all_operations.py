@@ -173,8 +173,13 @@ class TestMCPToolsExhaustive:
         async with Client(transport=server) as c:
             yield c
 
-    async def test_all_operations_in_list_operations(self, client: Client[FastMCPTransport], expected_operations: list[dict]) -> None:
-        """Every operation should appear in list_operations for its service."""
+    async def test_all_operations_in_list_operations(
+        self,
+        client: Client[FastMCPTransport],
+        registry: UnbluAPIRegistry,
+        expected_operations: list[dict],
+    ) -> None:
+        """Every operation should appear via registry service listing."""
         # Group by service
         by_service: dict[str, set[str]] = {}
         for op in expected_operations:
@@ -182,9 +187,9 @@ class TestMCPToolsExhaustive:
 
         failures = []
         for service, expected_ids in by_service.items():
-            result = await client.call_tool("list_operations", {"service": service})
-            assert result.structured_content is not None
-            actual_ids = {op["operation_id"] for op in result.structured_content["result"]}
+            # Use registry directly for exhaustive service listing (find_operation has a result limit)
+            registry_ops = registry.list_operations(service)
+            actual_ids = {op.operation_id for op in registry_ops}
 
             missing = expected_ids - actual_ids
             if missing:
@@ -193,32 +198,38 @@ class TestMCPToolsExhaustive:
         assert not failures, f"list_operations failures: {failures[:10]}"
 
     async def test_all_operations_searchable(self, client: Client[FastMCPTransport], expected_operations: list[dict]) -> None:
-        """Every operation should be findable via search_operations."""
+        """Every operation should be findable via find_operation."""
         # Test a sample (testing all 331 would be slow)
         sample = expected_operations[::10]  # Every 10th operation
 
         failures = []
         for op in sample:
-            result = await client.call_tool("search_operations", {"query": op["operation_id"], "limit": 50})
+            result = await client.call_tool("find_operation", {"query": op["operation_id"], "include_schema": False, "limit": 50})
             assert result.structured_content is not None
-            found_ids = {o["operation_id"] for o in result.structured_content["result"]}
+            found_ids = {o["operation_id"] for o in result.structured_content["matches"]}
 
             if op["operation_id"] not in found_ids:
                 failures.append(op["operation_id"])
 
-        assert not failures, f"search_operations failures: {failures}"
+        assert not failures, f"find_operation failures: {failures}"
 
     async def test_all_schemas_via_mcp(self, client: Client[FastMCPTransport], expected_operations: list[dict]) -> None:
-        """Every operation schema should be retrievable via MCP."""
+        """Every operation schema should be retrievable via find_operation with include_schema=True."""
         # Test a sample
         sample = expected_operations[::5]  # Every 5th operation
 
         failures = []
         for op in sample:
-            result = await client.call_tool("get_operation_schema", {"operation_id": op["operation_id"]})
+            result = await client.call_tool(
+                "find_operation",
+                {"query": op["operation_id"], "include_schema": True, "limit": 5},
+            )
             if result.structured_content is None:
                 failures.append(f"{op['operation_id']}: no content")
-            elif result.structured_content.get("operation_id") != op["operation_id"]:
-                failures.append(f"{op['operation_id']}: id mismatch")
+            else:
+                matches = result.structured_content.get("matches", [])
+                found = any(m.get("operation_id") == op["operation_id"] for m in matches)
+                if not found:
+                    failures.append(f"{op['operation_id']}: not found in top-5 results")
 
-        assert not failures, f"get_operation_schema failures: {failures[:10]}"
+        assert not failures, f"find_operation schema failures: {failures[:10]}"
