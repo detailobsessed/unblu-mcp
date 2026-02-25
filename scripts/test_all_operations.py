@@ -24,7 +24,7 @@ _MAX_ERRORS_SHOWN = 10
 
 def load_spec() -> dict:
     spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
-    with open(spec_path) as f:
+    with Path(spec_path).open(encoding="utf-8") as f:
         return json.load(f)
 
 
@@ -33,7 +33,7 @@ def get_expected_operations(spec: dict) -> list[dict]:
     operations = []
     for path, path_item in spec.get("paths", {}).items():
         for method, operation in path_item.items():
-            if method in ("get", "post", "put", "delete", "patch"):
+            if method in {"get", "post", "put", "delete", "patch"}:
                 op_id = operation.get("operationId", f"{method}_{path}")
                 tags = operation.get("tags", ["Other"])
                 primary_tag = tags[0] if tags else "Other"
@@ -45,16 +45,14 @@ def get_expected_operations(spec: dict) -> list[dict]:
                 # Extract path parameters
                 path_params = re.findall(r"\{(\w+)\}", path)
 
-                operations.append(
-                    {
-                        "operation_id": op_id,
-                        "method": method.upper(),
-                        "path": path,
-                        "tag": primary_tag,
-                        "path_params": path_params,
-                        "has_request_body": operation.get("requestBody") is not None,
-                    }
-                )
+                operations.append({
+                    "operation_id": op_id,
+                    "method": method.upper(),
+                    "path": path,
+                    "tag": primary_tag,
+                    "path_params": path_params,
+                    "has_request_body": operation.get("requestBody") is not None,
+                })
     return operations
 
 
@@ -122,7 +120,7 @@ def test_service_grouping(registry: UnbluAPIRegistry, expected_ops: list[dict]) 
     return errors
 
 
-def main() -> int:
+def main() -> int:  # noqa: PLR0912
     print("Loading swagger.json...")
     spec = load_spec()
 

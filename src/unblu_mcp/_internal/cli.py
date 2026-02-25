@@ -10,14 +10,17 @@
 #   there's no `unblu_mcp.__main__` in `sys.modules`.
 
 
+from __future__ import annotations
+
 import argparse
 import sys
-from typing import Any
-
-from fastmcp import FastMCP
+from typing import TYPE_CHECKING, Any
 
 from unblu_mcp._internal import debug
 from unblu_mcp._internal.exceptions import ConfigurationError
+
+if TYPE_CHECKING:
+    from fastmcp import FastMCP
 
 
 class _DebugInfo(argparse.Action):
@@ -97,7 +100,7 @@ def main(args: list[str] | None = None) -> int:
     try:
         server.run()
     except ConfigurationError as e:
-        print(f"\n❌ Configuration Error: {e}\n", file=sys.stderr)
+        print(f"\n❌ Configuration Error: {e}\n", file=sys.stderr)  # noqa: T201
         return 1
     return 0
 

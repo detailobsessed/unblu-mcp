@@ -65,7 +65,7 @@ hooks = [{ id = "markdownlint", args = ["--fix", "--ignore", "CHANGELOG.md"], pr
 
 [[repos]]
 repo = "https://github.com/lycheeverse/lychee"
-rev = "nightly"  # lychee tags nightly as latest; prek autoupdate may switch to it
+rev = "lychee-v0.23.0"
 hooks = [{ id = "lychee", args = ["--config", ".lychee.toml"], priority = 1, types_or = ["markdown", "html", "rst", "yaml"] }]
 
 [[repos]]
@@ -123,7 +123,7 @@ priority = 1
 [[repos.hooks]]
 id = "docs-build"
 name = "docs build check"
-entry = "bash -c 'test -f htmlcov/index.html || (mkdir -p htmlcov && touch htmlcov/index.html); uv run poe docs-build'"
+entry = "bash -c 'test -f htmlcov/index.html || (mkdir -p htmlcov && touch htmlcov/index.html); uv run poe docs-build; rm -f site/objects.inv'"
 language = "system"
 files = { glob = ["docs/**", "mkdocs.yml", "README.md", "CONTRIBUTING.md", "CHANGELOG.md", "src/**"] }
 pass_filenames = false

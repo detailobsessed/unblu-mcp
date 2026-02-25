@@ -63,7 +63,7 @@ def _yield_public_objects(
                     inherited=inherited,
                     special=special,
                 )
-        except (griffe.AliasResolutionError, griffe.CyclicAliasError):
+        except griffe.AliasResolutionError, griffe.CyclicAliasError:
             continue
 
 
@@ -86,7 +86,7 @@ def _fixture_public_objects(public_api: griffe.Module) -> list[griffe.Object | g
 def _fixture_inventory() -> Inventory:
     inventory_file = Path(__file__).parent.parent / "site" / "objects.inv"
     if not inventory_file.exists():
-        pytest.skip("The objects inventory is not available.")  # ty: ignore[call-non-callable]
+        pytest.skip("The objects inventory is not available.")
     with inventory_file.open("rb") as file:
         return Inventory.parse_sphinx(file)
 
@@ -94,9 +94,7 @@ def _fixture_inventory() -> Inventory:
 def test_exposed_objects(modulelevel_internal_objects: list[griffe.Object | griffe.Alias]) -> None:
     """All public objects in the internal API are exposed under `unblu_mcp`."""
     not_exposed = [
-        obj.path
-        for obj in modulelevel_internal_objects
-        if obj.name not in unblu_mcp.__all__ or not hasattr(unblu_mcp, obj.name)
+        obj.path for obj in modulelevel_internal_objects if obj.name not in unblu_mcp.__all__ or not hasattr(unblu_mcp, obj.name)
     ]
     assert not not_exposed, "Objects not exposed:\n" + "\n".join(sorted(not_exposed))
 
@@ -119,9 +117,7 @@ def test_single_locations(public_api: griffe.Module) -> None:
     multiple_locations = {}
     for obj_name in unblu_mcp.__all__:
         obj = public_api[obj_name]
-        if obj.aliases and (
-            public_aliases := [path for path, alias in obj.aliases.items() if path != obj.path and _public_path(alias)]
-        ):
+        if obj.aliases and (public_aliases := [path for path, alias in obj.aliases.items() if path != obj.path and _public_path(alias)]):
             multiple_locations[obj.path] = public_aliases
     assert not multiple_locations, "Multiple public locations:\n" + "\n".join(
         f"{path}: {aliases}" for path, aliases in multiple_locations.items()
@@ -152,11 +148,7 @@ def test_inventory_matches_api(
     public_api_paths = {obj.path for obj in public_objects}
     public_api_paths.add("unblu_mcp")
     for item in inventory.values():
-        if (
-            item.domain == "py"
-            and "(" not in item.name
-            and (item.name == "unblu_mcp" or item.name.startswith("unblu_mcp."))
-        ):
+        if item.domain == "py" and "(" not in item.name and (item.name == "unblu_mcp" or item.name.startswith("unblu_mcp.")):
             obj = loader.modules_collection[item.name]
             if obj.path not in public_api_paths and not any(path in public_api_paths for path in obj.aliases):
                 not_in_api.append(item.name)

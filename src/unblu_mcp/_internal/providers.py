@@ -94,7 +94,7 @@ class ConnectionProvider(ABC):
             ConnectionConfig with base_url, headers, auth, and timeout.
         """
 
-    async def health_check(self) -> bool:
+    async def health_check(self) -> bool:  # noqa: PLR6301
         """Check if the connection is healthy.
 
         Override this to implement custom health checks (e.g., ping the API).

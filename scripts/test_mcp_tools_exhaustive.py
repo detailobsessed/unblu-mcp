@@ -71,13 +71,13 @@ async def test_operation(client: Client, op_id: str, service: str) -> TestResult
         if schema_result.structured_content:
             schema = schema_result.structured_content
             result.schema_ok = schema.get("operation_id") == op_id
-            result.schema_has_method = "method" in schema and schema["method"] in (
+            result.schema_has_method = "method" in schema and schema["method"] in {
                 "GET",
                 "POST",
                 "PUT",
                 "DELETE",
                 "PATCH",
-            )
+            }
             result.schema_has_path = "path" in schema and schema["path"].startswith("/")
             result.schema_has_parameters = "parameters" in schema
 
@@ -116,8 +116,7 @@ async def run_tests(batch_size: int = 20) -> tuple[list[TestResult], dict]:
         for svc in services:
             ops_result = await client.call_tool("list_operations", {"service": svc["name"]})
             ops = ops_result.structured_content["result"]
-            for op in ops:
-                all_ops.append((op["operation_id"], svc["name"]))
+            all_ops.extend((op["operation_id"], svc["name"]) for op in ops)
 
         stats["total"] = len(all_ops)
         print(f"Testing {len(all_ops)} operations across {len(services)} services...")

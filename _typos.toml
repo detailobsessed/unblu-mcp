@@ -1,0 +1,3 @@
+[files]
+# swagger.json contains example IDs/values that are false positives
+extend-exclude = ["src/unblu_mcp/swagger.json"]

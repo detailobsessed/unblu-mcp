@@ -259,9 +259,7 @@ class TestCallApi:
             # Mock the HTTP response
             respx.post("https://api.unblu.cloud/test").mock(return_value=httpx.Response(201, json={"id": "123"}))
 
-            result = await mock_mcp_client.call_tool(
-                "call_api", {"operation_id": "testCreate", "body": {"name": "test"}}
-            )
+            result = await mock_mcp_client.call_tool("call_api", {"operation_id": "testCreate", "body": {"name": "test"}})
 
             assert result.data is not None
             assert result.structured_content is not None
@@ -275,9 +273,7 @@ class TestCallApi:
         """Test API error response handling."""
         with respx.mock:
             # Mock error response
-            respx.get("https://api.unblu.cloud/test").mock(
-                return_value=httpx.Response(404, json={"error": "Not found"})
-            )
+            respx.get("https://api.unblu.cloud/test").mock(return_value=httpx.Response(404, json={"error": "Not found"}))
 
             result = await mock_mcp_client.call_tool("call_api", {"operation_id": "testGet"})
 
@@ -295,9 +291,7 @@ class TestCallApi:
             # Mock 204 response
             respx.delete("https://api.unblu.cloud/test/123").mock(return_value=httpx.Response(204))
 
-            result = await mock_mcp_client.call_tool(
-                "call_api", {"operation_id": "testDelete", "path_params": {"id": "123"}}
-            )
+            result = await mock_mcp_client.call_tool("call_api", {"operation_id": "testDelete", "path_params": {"id": "123"}})
 
             assert result.data is not None
             assert result.structured_content is not None
