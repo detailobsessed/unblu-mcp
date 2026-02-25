@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 <!-- version list -->
 
+## v0.8.2 (2026-02-25)
+
+### Bug Fixes
+
+- Fix CHANGELOG.md never updating (wrong insertion marker + deprecated PSR v10 config)
+  ([#145](https://github.com/detailobsessed/unblu-mcp/pull/145),
+  [`26e77b0`](https://github.com/detailobsessed/unblu-mcp/commit/26e77b0923ce5b9fe82d440ef995a1a11fd6bb2f))
+
+
 ## v0.8.1 (2026-02-25)
 
 ### Bug Fixes
