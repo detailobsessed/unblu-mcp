@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+import asyncio
 import contextlib
 import importlib.resources
 import json
+import os
 import re
+import urllib.parse
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Literal
@@ -28,6 +31,8 @@ from unblu_mcp._internal.models import (
     OperationResult,
     OperationSearchResult,
     PersonAmbiguousResult,
+    PersonBatchEntry,
+    PersonBatchResult,
     PersonDetail,
     PersonPage,
     PersonSummary,
@@ -53,6 +58,8 @@ _MAX_REF_DEPTH = 3
 _HTTP_NO_CONTENT = 204
 _HTTP_NOT_FOUND = 404
 _HTTP_CLIENT_ERROR = 400
+_HTTP_RATE_LIMIT = 429
+_HTTP_SERVER_ERROR = 500
 _DEFAULT_TRUNCATE_CHARS = 10_000
 
 # Services hidden from find_operation by default (infra / security-sensitive)
@@ -470,6 +477,23 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
         with contextlib.suppress(RuntimeError):
             await ctx.info(message)
 
+    def _error_hint(status_code: int) -> str:
+        """Return an error classification hint for agents."""
+        if status_code == _HTTP_RATE_LIMIT:
+            return " [RATE_LIMITED] Wait a few seconds and retry the same call."
+        if status_code >= _HTTP_SERVER_ERROR:
+            return " [SERVER_ERROR] May be transient — retry once. If it persists, the Unblu backend may be down."
+        return " [PERMANENT] Do not retry without changing parameters."
+
+    def _gui_url(resource: str, resource_id: str) -> str | None:
+        """Build an Unblu admin console URL for a resource, or None if base URL is unknown."""
+        raw = os.getenv("UNBLU_BASE_URL", "")
+        if not raw or not resource_id:
+            return None
+        parsed = urllib.parse.urlparse(raw)
+        origin = f"{parsed.scheme}://{parsed.netloc}"
+        return f"{origin}/unblu/index.html#/{resource}/{resource_id}"
+
     async def _request(
         method: str,
         path: str,
@@ -486,7 +510,7 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
                 json=body or None,
             )
         except httpx.RequestError as e:
-            msg = f"API request failed: {e!s}"
+            msg = f"API request failed: {e!s} [NETWORK_ERROR] This is likely transient — retry."
             raise ToolError(msg) from e
 
         if response.status_code == _HTTP_NO_CONTENT:
@@ -724,19 +748,20 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
             body=effective_body,
         )
 
-        # Apply field filtering
-        if fields and isinstance(data, dict):
-            data = _filter_fields(data, fields)
-
-        # Parse pagination from response
+        # Parse pagination from response (must happen before field filtering to preserve
+        # pagination keys like hasMoreItems/nextOffset)
         has_more: bool | None = None
         next_offset_val: int | None = None
         if isinstance(data, dict) and "hasMoreItems" in data:
             has_more, next_offset_val = parse_pagination(data)
-            # Unwrap items for cleaner response
-            if "items" in data:
-                items_data = data.get("items", [])
-                data = {"items": items_data, "total_in_page": len(items_data)}
+            # Unwrap items, applying field filtering per item if requested
+            items_data: list[Any] = data.get("items", [])
+            if fields:
+                items_data = [_filter_fields(item, fields) for item in items_data]
+            data = {"items": items_data, "total_in_page": len(items_data)}
+        elif fields and isinstance(data, dict):
+            # Non-paginated: filter the whole response dict
+            data = _filter_fields(data, fields)
 
         # Truncate large responses
         data, truncated = _truncate(
@@ -786,12 +811,20 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
         await _ctx_log(ctx, "Fetching current account info")
         status_code, data = await _request("GET", "/accounts/getCurrentAccount")
         if status_code >= _HTTP_CLIENT_ERROR:
-            msg = f"Failed to get current account (HTTP {status_code}). Verify UNBLU_BASE_URL, UNBLU_API_KEY, or UNBLU_USERNAME/PASSWORD."
+            hint = _error_hint(status_code)
+            msg = (
+                f"Failed to get current account (HTTP {status_code}). "
+                f"Verify UNBLU_BASE_URL, UNBLU_API_KEY, or UNBLU_USERNAME/PASSWORD.{hint}"
+            )
             raise ToolError(msg)
-        return AccountInfo(
+        result = AccountInfo(
             id=data.get("id", ""),
             name=data.get("name") or data.get("displayName"),
         )
+        with contextlib.suppress(RuntimeError):
+            await ctx.set_state("account_id", result.id)
+            await ctx.set_state("account_name", result.name or "")
+        return result
 
     # ------------------------------------------------------------------
     # Tool 4 — search_conversations
@@ -811,6 +844,7 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
         topic: str | None = None,
         offset: int = 0,
         limit: int = 25,
+        fields: list[str] | None = None,
     ) -> ConversationPage:
         """Search and list Unblu conversations with optional filters.
 
@@ -823,6 +857,9 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
             topic: Filter by topic text (case-insensitive contains match).
             offset: Page offset for pagination (default 0).
             limit: Number of conversations to return (default 25, max ~100).
+            fields: Optional list of field names to include in each item (e.g.
+                    ["id", "state"]). When set, items are returned as filtered dicts
+                    instead of full objects, reducing token usage on large result sets.
 
         Returns:
             Paginated list of conversations with id, topic, status, timestamps,
@@ -874,26 +911,29 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
 
         status_code, data = await _request("POST", "/conversations/search", body=body)
         if status_code >= _HTTP_CLIENT_ERROR:
-            msg = f"Conversation search failed (HTTP {status_code}): {str(data)[:200]}"
+            msg = f"Conversation search failed (HTTP {status_code}): {str(data)[:200]}{_error_hint(status_code)}"
             raise ToolError(msg)
 
         has_more, next_offset_val = parse_pagination(data)
         raw_items: list[dict[str, Any]] = data.get("items", [])
 
-        items = [
-            ConversationSummary(
-                id=c.get("id", ""),
-                topic=c.get("topic"),
-                state=c.get("state", ""),
-                created_at=c.get("creationTimestamp"),
-                ended_at=c.get("endTimestamp"),
-                awaited_person_type=c.get("awaitedPersonType"),
-                participant_count=len(c.get("participants", [])),
-                bot_participant_count=len(c.get("botParticipants", [])),
-                source_url=c.get("sourceUrl"),
-            )
-            for c in raw_items
-        ]
+        if fields:
+            items: list[Any] = [_filter_fields(c, fields) for c in raw_items]
+        else:
+            items = [
+                ConversationSummary(
+                    id=c.get("id", ""),
+                    topic=c.get("topic"),
+                    state=c.get("state", ""),
+                    created_at=c.get("creationTimestamp"),
+                    ended_at=c.get("endTimestamp"),
+                    awaited_person_type=c.get("awaitedPersonType"),
+                    participant_count=len(c.get("participants", [])),
+                    bot_participant_count=len(c.get("botParticipants", [])),
+                    source_url=c.get("sourceUrl"),
+                )
+                for c in raw_items
+            ]
 
         next_steps = ["Call get_conversation(conversation_id='<id>') for full details."]
         if has_more:
@@ -935,10 +975,10 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
         await _ctx_log(ctx, f"Fetching conversation {conversation_id}")
         status_code, data = await _request("GET", f"/conversations/{conversation_id}")
         if status_code == _HTTP_NOT_FOUND:
-            msg = f"Conversation '{conversation_id}' not found. Call search_conversations() to find valid IDs."
+            msg = f"Conversation '{conversation_id}' not found. Call search_conversations() to find valid IDs. [PERMANENT]"
             raise ToolError(msg)
         if status_code >= _HTTP_CLIENT_ERROR:
-            msg = f"Failed to get conversation (HTTP {status_code}): {str(data)[:200]}"
+            msg = f"Failed to get conversation (HTTP {status_code}): {str(data)[:200]}{_error_hint(status_code)}"
             raise ToolError(msg)
 
         participants = [
@@ -967,6 +1007,7 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
             participants=participants,
             bot_participant_count=len(data.get("botParticipants", [])),
             metadata=data.get("metadata"),
+            gui_url=_gui_url("conversations", data.get("id", "")),
             next_steps=[
                 "Call get_person(identifier='<personId>') to inspect any participant.",
                 "Call assign_conversation(conversation_id, assignee_person_id) to reassign.",
@@ -1016,7 +1057,7 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
             msg = (
                 f"Failed to assign conversation (HTTP {status_code}): {str(data)[:200]}. "
                 "Verify conversation_id with get_conversation() and "
-                "assignee_person_id with search_persons(person_type='AGENT')."
+                f"assignee_person_id with search_persons(person_type='AGENT').{_error_hint(status_code)}"
             )
             raise ToolError(msg)
         return OperationResult(
@@ -1067,7 +1108,7 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
             msg = (
                 f"Failed to end conversation (HTTP {status_code}): {str(data)[:200]}. "
                 "Verify the conversation exists and is not already ended "
-                f"with get_conversation('{conversation_id}')."
+                f"with get_conversation('{conversation_id}').{_error_hint(status_code)}"
             )
             raise ToolError(msg)
         return OperationResult(
@@ -1090,12 +1131,13 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
             "openWorldHint": False,
         },
     )
-    async def search_persons(
+    async def search_persons(  # noqa: PLR0913, PLR0917
         ctx: Context,
         query: str | None = None,
         person_type: Literal["AGENT", "VISITOR", "BOT", "SYSTEM"] | None = None,
         offset: int = 0,
         limit: int = 25,
+        fields: list[str] | None = None,
     ) -> PersonPage:
         """Search Unblu persons (real-time session participants).
 
@@ -1110,6 +1152,9 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
                          SYSTEM = internal system persons.
             offset: Page offset for pagination (default 0).
             limit: Number of persons to return (default 25).
+            fields: Optional list of field names to include per item (e.g. ["id",
+                    "personType"]). When set, items are filtered dicts instead of
+                    full PersonSummary objects, reducing token usage.
 
         Returns:
             Paginated list of persons with id, display_name, type, email, team.
@@ -1164,23 +1209,26 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
 
         status_code, data = await _request("POST", endpoint, body=body)
         if status_code >= _HTTP_CLIENT_ERROR:
-            msg = f"Person search failed (HTTP {status_code}): {str(data)[:200]}"
+            msg = f"Person search failed (HTTP {status_code}): {str(data)[:200]}{_error_hint(status_code)}"
             raise ToolError(msg)
 
         has_more, next_offset_val = parse_pagination(data)
         raw_items: list[dict[str, Any]] = data.get("items", [])
 
-        items = [
-            PersonSummary(
-                id=p.get("id", ""),
-                display_name=p.get("displayName"),
-                person_type=p.get("personType"),
-                email=p.get("email"),
-                team_id=p.get("teamId"),
-                authorization_role=p.get("authorizationRole"),
-            )
-            for p in raw_items
-        ]
+        if fields:
+            items: list[Any] = [_filter_fields(p, fields) for p in raw_items]
+        else:
+            items = [
+                PersonSummary(
+                    id=p.get("id", ""),
+                    display_name=p.get("displayName"),
+                    person_type=p.get("personType"),
+                    email=p.get("email"),
+                    team_id=p.get("teamId"),
+                    authorization_role=p.get("authorizationRole"),
+                )
+                for p in raw_items
+            ]
 
         next_steps = ["Call get_person(identifier='<id>') for full person details."]
         if has_more:
@@ -1197,48 +1245,22 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
     # Tool 9 — get_person
     # ------------------------------------------------------------------
 
-    @mcp.tool(
-        annotations={
-            "title": "Get Person",
-            "readOnlyHint": True,
-            "openWorldHint": False,
-        },
-    )
-    async def get_person(
-        ctx: Context,
-        identifier: str,
-    ) -> PersonDetail | PersonAmbiguousResult:
-        """Get full details of a person by UUID, email, or display name.
-
-        Accepts natural identifiers — you do not need to know the internal UUID:
-        - UUID (e.g. "a1b2c3d4-..."):  direct lookup
-        - Email (contains "@"):         email search
-        - Any other string:             compound text search (name, username, etc.)
-
-        If multiple persons match a name search, returns a list of candidates so
-        you can call again with the exact person_id.
-
-        Args:
-            identifier: Person UUID, email address, or display name / username.
-
-        Returns:
-            PersonDetail with id, type, display_name, email, team, labels, note.
-            Or PersonAmbiguousResult if multiple name matches are found.
-        """
+    async def _resolve_person(ctx: Context, identifier: str) -> PersonDetail | PersonAmbiguousResult:
+        """Resolve a person by UUID, email, or name. Used by get_person and get_persons."""
         await _ctx_log(ctx, f"Looking up person: {identifier}")
 
-        # Strategy 1: UUID direct lookup
+        # Strategy 1: UUID direct lookup (fastest — single GET)
         if _UUID_RE.match(identifier):
             status_code, data = await _request("GET", f"/persons/{identifier}")
             if status_code == _HTTP_NOT_FOUND:
-                msg = f"Person '{identifier}' not found. Call search_persons() to browse available persons."
+                msg = f"Person '{identifier}' not found. Call search_persons() to browse available persons. [PERMANENT]"
                 raise ToolError(msg)
             if status_code >= _HTTP_CLIENT_ERROR:
-                msg = f"Failed to fetch person (HTTP {status_code}): {str(data)[:200]}"
+                msg = f"Failed to fetch person (HTTP {status_code}): {str(data)[:200]}{_error_hint(status_code)}"
                 raise ToolError(msg)
             return _person_detail(data)
 
-        # Strategy 2: Email search
+        # Strategy 2: Email search (exact match)
         if "@" in identifier:
             body = build_query_body(
                 offset=0,
@@ -1274,10 +1296,10 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
                     ],
                     next_steps=["Call get_person(identifier='<person_id>') with the exact UUID."],
                 )
-            msg = f"No person found with email '{identifier}'. Call search_persons() to browse available persons."
+            msg = f"No person found with email '{identifier}'. Call search_persons() to browse available persons. [PERMANENT]"
             raise ToolError(msg)
 
-        # Strategy 3: Compound text search (name, username, etc.)
+        # Strategy 3: Compound text search (slower — POST search)
         body = build_query_body(
             offset=0,
             limit=10,
@@ -1313,8 +1335,41 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
                 ],
                 next_steps=["Call get_person(identifier='<person_id>') with the exact UUID."],
             )
-        msg = f"No person found matching '{identifier}'. Try search_persons(query='...') for a broader search."
+        msg = f"No person found matching '{identifier}'. Try search_persons(query='...') for a broader search. [PERMANENT]"
         raise ToolError(msg)
+
+    @mcp.tool(
+        annotations={
+            "title": "Get Person",
+            "readOnlyHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def get_person(
+        ctx: Context,
+        identifier: str,
+    ) -> PersonDetail | PersonAmbiguousResult:
+        """Get full details of a person by UUID, email, or display name.
+
+        Accepts natural identifiers — you do not need to know the internal UUID.
+        Resolution strategy (fastest to slowest):
+        - UUID (e.g. "a1b2c3d4-..."): direct GET — fastest, use this when you have it.
+        - Email (contains "@"):        exact email search.
+        - Any other string:            compound text search (name, username, etc.) — may
+                                       return multiple candidates if the name is ambiguous.
+
+        If multiple persons match a name search, returns PersonAmbiguousResult with
+        candidate list so you can call again with the exact person_id UUID.
+
+        Args:
+            identifier: Person UUID, email address, or display name / username.
+                        Prefer UUID when available — it is the fastest lookup path.
+
+        Returns:
+            PersonDetail with id, type, display_name, email, team, labels, note.
+            Or PersonAmbiguousResult if multiple name matches are found.
+        """
+        return await _resolve_person(ctx, identifier)
 
     def _person_detail(data: dict[str, Any]) -> PersonDetail:
         return PersonDetail(
@@ -1330,9 +1385,67 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
             authorization_role=data.get("authorizationRole"),
             source_id=data.get("sourceId"),
             source_url=data.get("sourceUrl"),
+            gui_url=_gui_url("persons", data.get("id", "")),
             next_steps=[
                 "Call search_conversations(assignee_person_id='<id>') to see their conversations.",
                 "Call search_persons() to find other persons.",
+            ],
+        )
+
+    # ------------------------------------------------------------------
+    # Tool 9b — get_persons (batch)
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        annotations={
+            "title": "Get Persons (Batch)",
+            "readOnlyHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def get_persons(
+        ctx: Context,
+        identifiers: list[str],
+    ) -> PersonBatchResult:
+        """Fetch full details for multiple persons in a single parallel call.
+
+        Equivalent to calling get_person() for each identifier, but all lookups
+        run concurrently. Ideal when debugging a conversation with several
+        participants — avoids N sequential round-trips.
+
+        Each identifier uses the same resolution strategy as get_person():
+        - UUID: fastest, direct GET.
+        - Email (contains "@"): exact email search.
+        - Any other string: compound name/username search.
+
+        Args:
+            identifiers: List of person UUIDs, emails, or display names. Max 20.
+                         Prefer UUIDs for speed. Use get_person() for single lookups.
+
+        Returns:
+            PersonBatchResult with one entry per identifier. Each entry has either
+            a result (PersonDetail or PersonAmbiguousResult) or an error string.
+        """
+        capped = identifiers[:20]
+        await _ctx_log(ctx, f"Batch-looking up {len(capped)} persons")
+
+        async def _single(ident: str) -> PersonBatchEntry:
+            try:
+                result = await _resolve_person(ctx, ident)
+                return PersonBatchEntry(identifier=ident, result=result)
+            except ToolError as exc:
+                return PersonBatchEntry(identifier=ident, error=str(exc))
+
+        entries = list(await asyncio.gather(*[_single(i) for i in capped]))
+        succeeded = sum(1 for e in entries if e.error is None)
+        return PersonBatchResult(
+            entries=entries,
+            total=len(entries),
+            succeeded=succeeded,
+            failed=len(entries) - succeeded,
+            next_steps=[
+                "For entries with error, try get_person() with a more specific identifier.",
+                "For PersonAmbiguousResult entries, call get_person(identifier='<uuid>') with the exact UUID.",
             ],
         )
 
@@ -1352,6 +1465,7 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
         query: str | None = None,
         offset: int = 0,
         limit: int = 25,
+        fields: list[str] | None = None,
     ) -> UserPage:
         """Search Unblu admin-level user accounts.
 
@@ -1362,6 +1476,9 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
             query: Free-text search across username, display name, email.
             offset: Page offset for pagination (default 0).
             limit: Number of users to return (default 25).
+            fields: Optional list of field names to include per item (e.g. ["id",
+                    "username"]). When set, items are filtered dicts instead of
+                    full UserSummary objects, reducing token usage.
 
         Returns:
             Paginated list of users with id, username, display_name, email, role.
@@ -1389,22 +1506,25 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
 
         status_code, data = await _request("POST", "/users/search", body=body)
         if status_code >= _HTTP_CLIENT_ERROR:
-            msg = f"User search failed (HTTP {status_code}): {str(data)[:200]}"
+            msg = f"User search failed (HTTP {status_code}): {str(data)[:200]}{_error_hint(status_code)}"
             raise ToolError(msg)
 
         has_more, next_offset_val = parse_pagination(data)
         raw_items: list[dict[str, Any]] = data.get("items", [])
 
-        items = [
-            UserSummary(
-                id=u.get("id", ""),
-                username=u.get("username"),
-                display_name=u.get("displayName"),
-                email=u.get("email"),
-                authorization_role=u.get("authorizationRole"),
-            )
-            for u in raw_items
-        ]
+        if fields:
+            items: list[Any] = [_filter_fields(u, fields) for u in raw_items]
+        else:
+            items = [
+                UserSummary(
+                    id=u.get("id", ""),
+                    username=u.get("username"),
+                    display_name=u.get("displayName"),
+                    email=u.get("email"),
+                    authorization_role=u.get("authorizationRole"),
+                )
+                for u in raw_items
+            ]
 
         next_steps = ["Call get_user(identifier='<id>') for full user details."]
         if has_more:
@@ -1434,28 +1554,30 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
     ) -> UserDetail:
         """Get full details of an Unblu user account by UUID, username, or email.
 
-        - UUID (e.g. "a1b2c3d4-..."): direct lookup
-        - Username (no "@"):           username lookup
-        - Email (contains "@"):        search by email
+        Resolution strategy (fastest to slowest):
+        - UUID (e.g. "a1b2c3d4-..."): direct GET — fastest, use this when you have it.
+        - Username (no "@"):           direct GET by username.
+        - Email (contains "@"):        search by email (POST search).
 
         For real-time session participants (agents/visitors), use get_person() instead.
 
         Args:
             identifier: User UUID, username, or email address.
+                        Prefer UUID or username when available — they are the fastest lookup paths.
 
         Returns:
             UserDetail with id, username, display_name, email, role, team.
         """
         await _ctx_log(ctx, f"Looking up user: {identifier}")
 
-        # UUID direct lookup
+        # UUID direct lookup (fastest)
         if _UUID_RE.match(identifier):
             status_code, data = await _request("GET", f"/users/{identifier}")
             if status_code == _HTTP_NOT_FOUND:
-                msg = f"User '{identifier}' not found. Call search_users() to browse available users."
+                msg = f"User '{identifier}' not found. Call search_users() to browse available users. [PERMANENT]"
                 raise ToolError(msg)
             if status_code >= _HTTP_CLIENT_ERROR:
-                msg = f"Failed to fetch user (HTTP {status_code}): {str(data)[:200]}"
+                msg = f"Failed to fetch user (HTTP {status_code}): {str(data)[:200]}{_error_hint(status_code)}"
                 raise ToolError(msg)
             return _user_detail(data)
 
@@ -1481,16 +1603,16 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
             items: list[dict[str, Any]] = data.get("items", []) if status_code < _HTTP_CLIENT_ERROR else []
             if items:
                 return _user_detail(items[0])
-            msg = f"No user found with email '{identifier}'. Call search_users() to browse available users."
+            msg = f"No user found with email '{identifier}'. Call search_users() to browse available users. [PERMANENT]"
             raise ToolError(msg)
 
-        # Username lookup
+        # Username lookup (direct GET)
         status_code, data = await _request("GET", "/users/getByUsername", query_params={"username": identifier})
         if status_code == _HTTP_NOT_FOUND:
-            msg = f"No user found with username '{identifier}'. Call search_users(query='{identifier}') to search more broadly."
+            msg = f"No user found with username '{identifier}'. Call search_users(query='{identifier}') to search more broadly. [PERMANENT]"
             raise ToolError(msg)
         if status_code >= _HTTP_CLIENT_ERROR:
-            msg = f"Failed to fetch user (HTTP {status_code}): {str(data)[:200]}"
+            msg = f"Failed to fetch user (HTTP {status_code}): {str(data)[:200]}{_error_hint(status_code)}"
             raise ToolError(msg)
         return _user_detail(data)
 
@@ -1505,6 +1627,7 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
             authorization_role=data.get("authorizationRole"),
             virtual_user=data.get("virtualUser"),
             externally_managed=data.get("externallyManaged"),
+            gui_url=_gui_url("users", data.get("id", "")),
             next_steps=[
                 "Call search_users() to find other users.",
                 "Call search_persons() to find real-time session participants.",
@@ -1543,7 +1666,7 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
 
         status_code, data = await _request("GET", "/availability/getAgentAvailability", query_params=params or None)
         if status_code >= _HTTP_CLIENT_ERROR:
-            msg = f"Failed to get agent availability (HTTP {status_code}): {str(data)[:200]}"
+            msg = f"Failed to get agent availability (HTTP {status_code}): {str(data)[:200]}{_error_hint(status_code)}"
             raise ToolError(msg)
 
         return AvailabilityInfo(
@@ -1608,7 +1731,7 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
 
         status_code, data = await _request("POST", "/namedAreas/search", body=body)
         if status_code >= _HTTP_CLIENT_ERROR:
-            msg = f"Named area search failed (HTTP {status_code}): {str(data)[:200]}"
+            msg = f"Named area search failed (HTTP {status_code}): {str(data)[:200]}{_error_hint(status_code)}"
             raise ToolError(msg)
 
         has_more, next_offset_val = parse_pagination(data)

@@ -82,7 +82,7 @@ class TestServerSurface:
         tools = await mock_mcp_client.list_tools()
         tool_names = [tool.name for tool in tools]
 
-        assert len(tools) == 13
+        assert len(tools) == 14
         expected = [
             "find_operation",
             "execute_operation",
@@ -93,6 +93,7 @@ class TestServerSurface:
             "end_conversation",
             "search_persons",
             "get_person",
+            "get_persons",
             "search_users",
             "get_user",
             "check_agent_availability",
@@ -107,9 +108,9 @@ class TestServerSurface:
 
     @pytest.mark.asyncio
     async def test_list_tools_real(self, real_mcp_client: Client[FastMCPTransport]):
-        """Server exposes 13 curated tools with real spec."""
+        """Server exposes 14 curated tools with real spec."""
         tools = await real_mcp_client.list_tools()
-        assert len(tools) == 13
+        assert len(tools) == 14
 
     @pytest.mark.asyncio
     async def test_list_resources(self, mock_mcp_client: Client[FastMCPTransport]):
@@ -367,7 +368,7 @@ class TestPerformance:
 
         async with Client(transport=server) as client:
             tools = await client.list_tools()
-            assert len(tools) == 13
+            assert len(tools) == 14
 
     @pytest.mark.asyncio
     async def test_find_operation_response_time(self, real_mcp_client: Client[FastMCPTransport]):
