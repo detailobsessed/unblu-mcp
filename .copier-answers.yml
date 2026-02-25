@@ -11,9 +11,9 @@ project_description: A model context protocol server for interacting with Unblu 
 project_name: unblu-mcp
 project_type: app
 project_visibility: public
-publish_to_pypi: false
+publish_to_pypi: true
 repository_host: github.com
-repository_namespace: ichoosetoaccept
+repository_namespace: detailobsessed
 repository_provider: github.com
 use_blacksmith_runners: true
 use_ci: true
