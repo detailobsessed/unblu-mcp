@@ -1,10 +1,10 @@
 # Changes here will be overwritten by Copier.
-_commit: 0.30.1
+_commit: 0.31.1
 _src_path: gh:detailobsessed/copier-uv-bleeding
 author_email: ismar@gmail.com
 author_fullname: Ismar Iljazovic
 author_username: ichoosetoaccept
-cli_framework: ''
+cli_framework: none
 copyright_license: ISC
 custom_pypi_index_url: ''
 project_description: A model context protocol server for interacting with Unblu deployments.

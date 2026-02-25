@@ -1,10 +1,9 @@
 name: docs
 
 "on":
-  workflow_run:
-    workflows: [release]
-    types: [completed]
-  workflow_dispatch:
+  push:
+    branches:
+    - main
 
 permissions:
   contents: read
@@ -16,44 +15,43 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
-    # Only run if release workflow succeeded (or manual trigger)
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
-    runs-on: blacksmith-4vcpu-ubuntu-2404
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
-          lfs: true
-
-      - name: Setup uv and Python
-        uses: astral-sh/setup-uv@v7.1.5
-        with:
-          python-version: "3.13"
-          enable-cache: true
-
-      - name: Install dependencies
-        run: uv sync --group docs
-
-      - name: Build docs
-        run: uv run mkdocs build
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v4
-        with:
-          path: site
-
   deploy:
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: blacksmith-4vcpu-ubuntu-2404
-    needs: build
+
     steps:
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
+    - uses: actions/configure-pages@v5
+
+    - name: Checkout
+      uses: actions/checkout@v6
+      with:
+        fetch-depth: 0
+
+    - name: Setup uv and Python
+      uses: astral-sh/setup-uv@v7
+      with:
+        python-version: "3.14"
+        enable-cache: true
+        cache-dependency-glob: pyproject.toml
+        github-token: ${{ secrets.GITHUB_TOKEN }}
+
+    - name: Install dependencies
+      run: uv sync --only-group docs
+
+    - name: Build documentation
+      env:
+        DEPLOY: "true"
+      run: |
+        mkdir -p htmlcov
+        echo '<html><body>No coverage report yet</body></html>' > htmlcov/index.html
+        uv run zensical build --clean
+
+    - uses: actions/upload-pages-artifact@v4
+      with:
+        path: site
+
+    - name: Deploy to GitHub Pages
+      id: deployment
+      uses: actions/deploy-pages@v4
