@@ -138,7 +138,7 @@ jobs:
       run: uv run poe setup
 
     - name: Download objects inventory
-      uses: actions/download-artifact@v7
+      uses: actions/download-artifact@v8
       with:
         name: objects.inv
         path: site/
