@@ -91,3 +91,11 @@ jobs:
 
     - name: Publish to PyPI
       run: uv publish
+
+  mcp-registry-publish:
+    needs: [release, pypi-publish]
+    if: needs.release.outputs.released == 'true' && needs.pypi-publish.result == 'success'
+    permissions:
+      id-token: write
+      contents: read
+    uses: detailobsessed/ci-components/.github/workflows/mcp-registry-publish.yml@main
