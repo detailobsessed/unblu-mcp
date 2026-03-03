@@ -33,6 +33,11 @@ nav = [
   ]},
 ]
 
+[project.validation]
+omitted_files = "warn"
+absolute_links = "warn"
+unrecognized_links = "warn"
+
 [project.theme]
 custom_dir = "docs/.overrides"
 features = [
@@ -105,6 +110,7 @@ inventories = ["https://docs.python.org/3/objects.inv"]
 paths = ["src"]
 
 [project.plugins.mkdocstrings.handlers.python.options]
+backlinks = "tree"
 docstring_section_style = "list"
 filters = ["!^_"]
 heading_level = 1

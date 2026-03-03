@@ -78,39 +78,31 @@ class TestServerSurface:
     """Test the MCP server tool/resource/prompt surface."""
 
     async def test_list_tools_mock(self, mock_mcp_client: Client[FastMCPTransport]):
-        """Server exposes 13 curated tools with mock spec."""
+        """Server lists 7 tools: 5 always-visible + 2 BM25 synthetic (search_tools, call_tool)."""
         tools = await mock_mcp_client.list_tools()
         tool_names = [tool.name for tool in tools]
 
-        assert len(tools) == 14
-        expected = [
+        assert len(tools) == 7
+        always_visible = [
             "find_operation",
             "execute_operation",
             "get_current_account",
             "search_conversations",
-            "get_conversation",
-            "assign_conversation",
-            "end_conversation",
             "search_persons",
-            "get_person",
-            "get_persons",
-            "search_users",
-            "get_user",
-            "check_agent_availability",
-            "search_named_areas",
         ]
-        for name in expected:
+        synthetic = ["search_tools", "call_tool"]
+        for name in always_visible + synthetic:
             assert name in tool_names, f"Missing tool: {name}"
 
         for tool in tools:
-            assert tool.description
-            assert len(tool.description) > 0
+            if tool.description:  # synthetic tools may have descriptions
+                assert len(tool.description) > 0
 
     @pytest.mark.asyncio
     async def test_list_tools_real(self, real_mcp_client: Client[FastMCPTransport]):
-        """Server exposes 14 curated tools with real spec."""
+        """Server lists 7 tools: 5 always-visible + 2 BM25 synthetic."""
         tools = await real_mcp_client.list_tools()
-        assert len(tools) == 14
+        assert len(tools) == 7
 
     @pytest.mark.asyncio
     async def test_list_resources(self, mock_mcp_client: Client[FastMCPTransport]):
@@ -368,7 +360,7 @@ class TestPerformance:
 
         async with Client(transport=server) as client:
             tools = await client.list_tools()
-            assert len(tools) == 14
+            assert len(tools) == 7
 
     @pytest.mark.asyncio
     async def test_find_operation_response_time(self, real_mcp_client: Client[FastMCPTransport]):

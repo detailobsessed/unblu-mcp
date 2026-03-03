@@ -1,20 +1,20 @@
 # Changes here will be overwritten by Copier.
-_commit: 0.31.1
+_commit: 0.31.13
 _src_path: gh:detailobsessed/copier-uv-bleeding
 author_email: ismar@gmail.com
 author_fullname: Ismar Iljazovic
 author_username: ichoosetoaccept
-cli_framework: none
 copyright_license: ISC
-custom_pypi_index_url: ''
 project_description: A model context protocol server for interacting with Unblu deployments.
 project_name: unblu-mcp
 project_type: app
 project_visibility: public
+publish_to_mcp_registry: false
 publish_to_pypi: true
 repository_host: github.com
 repository_namespace: detailobsessed
 repository_provider: github.com
 use_blacksmith_runners: true
 use_ci: true
+use_custom_pypi_index: false
 use_semantic_release: true

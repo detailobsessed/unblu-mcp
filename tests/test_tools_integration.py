@@ -391,19 +391,53 @@ class TestToolAnnotations:
                 assert tool.annotations is not None
                 assert tool.annotations.readOnlyHint is True, f"{tool.name} should be read-only"
 
-    async def test_end_conversation_is_destructive(self, client: Client[FastMCPTransport]) -> None:
-        """end_conversation has destructiveHint=True."""
-        tools = await client.list_tools()
-        tool = next(t for t in tools if t.name == "end_conversation")
-        assert tool.annotations is not None
-        assert tool.annotations.destructiveHint is True
+    async def test_end_conversation_is_destructive(self, client: Client[FastMCPTransport], server: FastMCP) -> None:
+        """end_conversation has destructiveHint=True.
 
-    async def test_assign_conversation_not_destructive(self, client: Client[FastMCPTransport]) -> None:
-        """assign_conversation is not destructive."""
-        tools = await client.list_tools()
-        tool = next(t for t in tools if t.name == "assign_conversation")
-        assert tool.annotations is not None
-        assert tool.annotations.destructiveHint is not True
+        Checks via BM25 search_tools (hidden tool discoverable by unique term 'irreversible'),
+        with fallback to raw server tool list for robustness.
+        """
+        result = await client.call_tool("search_tools", {"query": "irreversible"})
+        assert result.structured_content is not None
+        tools_data = result.structured_content.get("result", [])
+        if isinstance(tools_data, str):
+            import json
+
+            tools_data = json.loads(tools_data)
+        end_conv = next((t for t in tools_data if isinstance(t, dict) and t.get("name") == "end_conversation"), None)
+        if end_conv is None:
+            raw = await server._local_provider.list_tools()
+            end_conv_raw = next((t for t in raw if t.name == "end_conversation"), None)
+            assert end_conv_raw is not None, "end_conversation not found in server tool registry"
+            assert end_conv_raw.annotations is not None
+            assert end_conv_raw.annotations.destructiveHint is True
+        else:
+            annotations = end_conv.get("annotations") or {}
+            assert annotations.get("destructiveHint") is True
+
+    async def test_assign_conversation_not_destructive(self, client: Client[FastMCPTransport], server: FastMCP) -> None:
+        """assign_conversation is not destructive.
+
+        Checks via BM25 search_tools (hidden tool discoverable by unique term 'reassign'),
+        with fallback to raw server tool list for robustness.
+        """
+        result = await client.call_tool("search_tools", {"query": "reassign investigation"})
+        assert result.structured_content is not None
+        tools_data = result.structured_content.get("result", [])
+        if isinstance(tools_data, str):
+            import json
+
+            tools_data = json.loads(tools_data)
+        assign_conv = next((t for t in tools_data if isinstance(t, dict) and t.get("name") == "assign_conversation"), None)
+        if assign_conv is None:
+            raw = await server._local_provider.list_tools()
+            assign_conv_raw = next((t for t in raw if t.name == "assign_conversation"), None)
+            assert assign_conv_raw is not None, "assign_conversation not found in server tool registry"
+            assert assign_conv_raw.annotations is not None
+            assert assign_conv_raw.annotations.destructiveHint is not True
+        else:
+            annotations = assign_conv.get("annotations") or {}
+            assert annotations.get("destructiveHint") is not True
 
 
 @pytest.mark.asyncio
