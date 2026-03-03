@@ -244,6 +244,7 @@ inspect = "DANGEROUSLY_OMIT_AUTH=true npx -y @modelcontextprotocol/inspector uv 
 
 # Documentation
 docs = "zensical serve"
+docs-build = "zensical build --clean"
 
 docs-deploy = "zensical gh-deploy"
 

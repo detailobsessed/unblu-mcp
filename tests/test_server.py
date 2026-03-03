@@ -146,32 +146,25 @@ class TestMCPServer:
 
     @pytest.mark.anyio
     async def test_server_has_tools(self, server: FastMCP) -> None:
-        """Server has the expected curated debugging tools."""
+        """Server exposes always-visible tools + BM25 synthetic discovery tools."""
         tools = await server.list_tools()
         tool_names = [t.name for t in tools]
-        expected_tools = [
+        always_visible = [
             "find_operation",
             "execute_operation",
             "get_current_account",
             "search_conversations",
-            "get_conversation",
-            "assign_conversation",
-            "end_conversation",
             "search_persons",
-            "get_person",
-            "search_users",
-            "get_user",
-            "check_agent_availability",
-            "search_named_areas",
         ]
-        for tool_name in expected_tools:
+        synthetic = ["search_tools", "call_tool"]
+        for tool_name in always_visible + synthetic:
             assert tool_name in tool_names, f"Missing tool: {tool_name}"
 
     @pytest.mark.anyio
     async def test_server_tool_count(self, server: FastMCP) -> None:
-        """Server has exactly 14 curated tools."""
+        """Server lists 7 tools: 5 always-visible + 2 BM25 synthetic (search_tools, call_tool)."""
         tools = await server.list_tools()
-        assert len(tools) == 14
+        assert len(tools) == 7
 
     @pytest.mark.anyio
     async def test_server_has_resources(self, server: FastMCP) -> None:

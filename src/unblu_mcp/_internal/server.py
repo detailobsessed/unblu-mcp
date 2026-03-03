@@ -17,6 +17,7 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.middleware.caching import CallToolSettings, ResponseCachingMiddleware
 from fastmcp.server.middleware.error_handling import ErrorHandlingMiddleware
 from fastmcp.server.middleware.logging import LoggingMiddleware
+from fastmcp.server.transforms.search import BM25SearchTransform
 from pydantic import BaseModel, Field
 
 from unblu_mcp._internal.models import (
@@ -394,17 +395,18 @@ def create_server(  # noqa: PLR0913, PLR0917, PLR0915
 
 Primary use: find conversations, inspect participants, verify user/bot/agent state, audit activity.
 
-## Quick start
-1. get_current_account()          — confirm which Unblu account you're connected to
-2. search_conversations(status=)  — list/filter conversations
-3. get_conversation(id)           — full details of a single conversation
-4. search_persons(person_type=)   — find agents, visitors, bots
-5. get_person(identifier)         — lookup by UUID, email, or display name
-6. check_agent_availability()     — see who is online
+## Core tools (always visible)
+- get_current_account()           — confirm connectivity and identify the account (always call first)
+- find_operation(query)           — search all 300+ Unblu API operations by keyword; returns schema inline
+- execute_operation(operation_id) — run any operation with path/query/body params
+- search_conversations(status=)   — list/filter conversations by state, assignee, or topic
+- search_persons(person_type=)    — find agents, visitors, bots by type or free-text
 
-## Discover other operations
-- find_operation(query)           — search all 300+ API ops by keyword; returns schema inline
-- execute_operation(operation_id) — run any op with path/query/body params
+## Discovery — tools not shown by default
+Use search_tools(query=...) to find any tool by natural language description.
+Then use call_tool(name=..., arguments={...}) to invoke it.
+Tools available via discovery: get_conversation, assign_conversation, end_conversation,
+get_person, get_persons, search_users, get_user, check_agent_availability, search_named_areas.
 
 ## Resources (read without a tool call)
 - api://services                  — full service catalog
@@ -427,6 +429,19 @@ Primary use: find conversations, inspect participants, verify user/bot/agent sta
         LoggingMiddleware(
             include_payloads=True,
             max_payload_length=1000,
+        )
+    )
+
+    mcp.add_transform(
+        BM25SearchTransform(
+            max_results=8,
+            always_visible=[
+                "get_current_account",
+                "find_operation",
+                "execute_operation",
+                "search_conversations",
+                "search_persons",
+            ],
         )
     )
 
