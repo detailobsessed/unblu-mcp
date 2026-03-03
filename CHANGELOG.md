@@ -7,6 +7,41 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 <!-- version list -->
 
+## v0.8.3 (2026-03-03)
+
+### Bug Fixes
+
+- Restore mcp-registry-publish — move trigger into release workflow
+  ([#154](https://github.com/detailobsessed/unblu-mcp/pull/154),
+  [`1c57d04`](https://github.com/detailobsessed/unblu-mcp/commit/1c57d042e85b3ae6ed8e0b69e58c9163dd7d799c))
+
+### Chores
+
+- Update project dependencies to latest
+  ([#153](https://github.com/detailobsessed/unblu-mcp/pull/153),
+  [`bc51330`](https://github.com/detailobsessed/unblu-mcp/commit/bc5133086fa03475ea0fd72bff6af49f29792fe1))
+
+- **deps**: Bump poethepoet from 0.42.0 to 0.42.1
+  ([#151](https://github.com/detailobsessed/unblu-mcp/pull/151),
+  [`a37c3b7`](https://github.com/detailobsessed/unblu-mcp/commit/a37c3b77f08d5de32b9b7fe30842395e1260d423))
+
+- **deps**: Bump pyasn1 in the uv group across 1 directory
+  ([#107](https://github.com/detailobsessed/unblu-mcp/pull/107),
+  [`2b6e711`](https://github.com/detailobsessed/unblu-mcp/commit/2b6e7112292a2ad62c56828e7698132d87bcc3a9))
+
+- **deps**: Bump ruff from 0.15.2 to 0.15.4
+  ([#150](https://github.com/detailobsessed/unblu-mcp/pull/150),
+  [`7a78b79`](https://github.com/detailobsessed/unblu-mcp/commit/7a78b794ac2f5a03cba15998e7b41722c43e0396))
+
+- **deps**: Bump ty from 0.0.18 to 0.0.19
+  ([#149](https://github.com/detailobsessed/unblu-mcp/pull/149),
+  [`86ef65f`](https://github.com/detailobsessed/unblu-mcp/commit/86ef65fd0f246bb0d96a6b4ce0d17a35283a1ba9))
+
+- **deps**: Bump zensical from 0.0.23 to 0.0.24
+  ([#148](https://github.com/detailobsessed/unblu-mcp/pull/148),
+  [`99c0a13`](https://github.com/detailobsessed/unblu-mcp/commit/99c0a1329d197d1338eebdf4ec2f544c1198f726))
+
+
 ## v0.8.2 (2026-02-25)
 
 ### Bug Fixes
