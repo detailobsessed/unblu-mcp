@@ -7,7 +7,7 @@
 [![pypi version](https://img.shields.io/pypi/v/unblu-mcp.svg)](https://pypi.org/project/unblu-mcp/)
 [![python versions](https://img.shields.io/pypi/pyversions/unblu-mcp.svg)](https://pypi.org/project/unblu-mcp/)
 [![license](https://img.shields.io/pypi/l/unblu-mcp.svg)](https://github.com/detailobsessed/unblu-mcp/blob/main/LICENSE)
-[![FastMCP](https://img.shields.io/badge/FastMCP-2.14+-00ADD8.svg)](https://github.com/jlowin/fastmcp)
+[![FastMCP](https://img.shields.io/badge/FastMCP-3.1+-00ADD8.svg)](https://github.com/jlowin/fastmcp)
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server for debugging and operating [Unblu](https://www.unblu.com/) deployments. Optimised for debugging workflows — curated typed tools for common operations, plus an escape hatch for the full 300+ endpoint API.
 
