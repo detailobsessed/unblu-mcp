@@ -150,8 +150,6 @@ class TestMCPServer:
         tools = await server.list_tools()
         tool_names = [t.name for t in tools]
         always_visible = [
-            "find_operation",
-            "execute_operation",
             "get_current_account",
             "search_conversations",
             "search_persons",
@@ -162,9 +160,9 @@ class TestMCPServer:
 
     @pytest.mark.anyio
     async def test_server_tool_count(self, server: FastMCP) -> None:
-        """Server lists 7 tools: 5 always-visible + 2 BM25 synthetic (search_tools, call_tool)."""
+        """Server lists 5 tools: 3 always-visible + 2 BM25 synthetic (search_tools, call_tool)."""
         tools = await server.list_tools()
-        assert len(tools) == 7
+        assert len(tools) == 5
 
     @pytest.mark.anyio
     async def test_server_has_resources(self, server: FastMCP) -> None:
@@ -462,52 +460,6 @@ class TestCreateServerEdgeCases:
 
         spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
         server = create_server(spec_path=spec_path, provider=CustomProvider())
-        assert server is not None
-
-
-# Check if eunomia_mcp is available
-try:
-    import eunomia_mcp  # noqa: F401
-
-    HAS_EUNOMIA = True
-except ImportError:
-    HAS_EUNOMIA = False
-
-
-@pytest.mark.skipif(not HAS_EUNOMIA, reason="eunomia_mcp not installed")
-class TestEunomiaIntegration:
-    """Tests for Eunomia authorization middleware integration."""
-
-    def test_create_server_with_policy_file(self, tmp_path: Path) -> None:
-        """create_server accepts policy_file parameter."""
-        # Create a minimal policy file
-        policy_file = tmp_path / "test_policy.json"
-        policy_file.write_text(
-            json.dumps({
-                "version": "1.0",
-                "name": "test-policy",
-                "default_effect": "allow",
-                "rules": [],
-            }),
-            encoding="utf-8",
-        )
-
-        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
-        server = create_server(spec_path=spec_path, policy_file=policy_file)
-        assert server is not None
-
-    def test_create_server_policy_file_not_found(self, tmp_path: Path) -> None:
-        """create_server raises FileNotFoundError for missing policy file."""
-        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
-        nonexistent_policy = tmp_path / "nonexistent.json"
-
-        with pytest.raises(FileNotFoundError, match=r"Policy file not found"):
-            create_server(spec_path=spec_path, policy_file=nonexistent_policy)
-
-    def test_create_server_without_policy_file(self) -> None:
-        """create_server works without policy_file (default behavior)."""
-        spec_path = Path(__file__).parent.parent / "src" / "unblu_mcp" / "swagger.json"
-        server = create_server(spec_path=spec_path, policy_file=None)
         assert server is not None
 
 

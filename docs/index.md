@@ -19,11 +19,10 @@ This server implements best practices from Anthropic's guide on [building effect
 - **Field Filtering** — Request only the fields you need to reduce response size
 - **Response Truncation** — Limit response sizes to prevent token overflow
 
-Built with [FastMCP 2.14+](https://github.com/jlowin/fastmcp), leveraging cutting-edge features:
+Built with [FastMCP 3.1+](https://github.com/jlowin/fastmcp), leveraging cutting-edge features:
 
 - **MCP Annotations** — Tools include `readOnlyHint`, `destructiveHint`, and `openWorldHint` metadata for smarter AI decision-making
 - **Response Caching** — Discovery tools cache results via FastMCP middleware for faster repeated queries
-- **Policy-Based Authorization** — Optional [Eunomia](https://github.com/whataboutyou-ai/eunomia) integration for controlling which API operations are allowed
 - **Built-in Logging** — Automatic file-based logging with daily rotation for debugging and usage analysis
 - **MCP 2025-11-25 Spec** — Full support for the latest Model Context Protocol specification
 
@@ -59,6 +58,4 @@ See [Available Tools](tools.md) for detailed usage examples.
 ## Security
 
 !!! warning "Security First"
-    This server includes built-in safety controls. The `call_api` tool is marked with `destructiveHint: true` to trigger client confirmations, and optional [Eunomia](https://github.com/whataboutyou-ai/eunomia) integration provides server-side policy enforcement to block destructive operations.
-
-See [Safety & Authorization](safety.md) for details on configuring access controls.
+    `execute_operation` is marked with `destructiveHint: true` to trigger client confirmations, and `DELETE` operations require `confirm_destructive=True` as an explicit safety gate before executing.

@@ -98,11 +98,3 @@ from unblu_mcp import create_server
 
 server = create_server(spec_path="/path/to/custom-swagger.json")
 ```
-
-## With Policy Enforcement
-
-```python
-from unblu_mcp import create_server
-
-server = create_server(policy_file="/path/to/mcp_policies.json")
-```

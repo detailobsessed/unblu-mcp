@@ -52,19 +52,6 @@ def test_show_debug_info(capsys: pytest.CaptureFixture) -> None:
     assert "packages" in captured
 
 
-def test_help_shows_policy_option(capsys: pytest.CaptureFixture) -> None:
-    """Help shows --policy option.
-
-    Parameters:
-        capsys: Pytest fixture to capture output.
-    """
-    with pytest.raises(SystemExit):
-        main(["-h"])
-    captured = capsys.readouterr()
-    assert "--policy" in captured.out
-    assert "Eunomia" in captured.out
-
-
 def test_help_shows_provider_options(capsys: pytest.CaptureFixture) -> None:
     """Help shows --provider, --environment, and --k8s-config options.
 

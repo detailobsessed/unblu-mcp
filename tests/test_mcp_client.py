@@ -78,14 +78,12 @@ class TestServerSurface:
     """Test the MCP server tool/resource/prompt surface."""
 
     async def test_list_tools_mock(self, mock_mcp_client: Client[FastMCPTransport]):
-        """Server lists 7 tools: 5 always-visible + 2 BM25 synthetic (search_tools, call_tool)."""
+        """Server lists 5 tools: 3 always-visible + 2 BM25 synthetic (search_tools, call_tool)."""
         tools = await mock_mcp_client.list_tools()
         tool_names = [tool.name for tool in tools]
 
-        assert len(tools) == 7
+        assert len(tools) == 5
         always_visible = [
-            "find_operation",
-            "execute_operation",
             "get_current_account",
             "search_conversations",
             "search_persons",
@@ -100,9 +98,9 @@ class TestServerSurface:
 
     @pytest.mark.asyncio
     async def test_list_tools_real(self, real_mcp_client: Client[FastMCPTransport]):
-        """Server lists 7 tools: 5 always-visible + 2 BM25 synthetic."""
+        """Server lists 5 tools: 3 always-visible + 2 BM25 synthetic."""
         tools = await real_mcp_client.list_tools()
-        assert len(tools) == 7
+        assert len(tools) == 5
 
     @pytest.mark.asyncio
     async def test_list_resources(self, mock_mcp_client: Client[FastMCPTransport]):
@@ -360,7 +358,7 @@ class TestPerformance:
 
         async with Client(transport=server) as client:
             tools = await client.list_tools()
-            assert len(tools) == 7
+            assert len(tools) == 5
 
     @pytest.mark.asyncio
     async def test_find_operation_response_time(self, real_mcp_client: Client[FastMCPTransport]):
