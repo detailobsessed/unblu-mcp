@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 <!-- version list -->
 
+## v0.10.0 (2026-03-05)
+
+### Chores
+
+- Update template to 0.31.14 ([#157](https://github.com/detailobsessed/unblu-mcp/pull/157),
+  [`31134e0`](https://github.com/detailobsessed/unblu-mcp/commit/31134e07a8bc6d32cf1f67ff75b0ba2722677316))
+
+### Features
+
+- Add check_deployment_health tool — 7-check parallel health report
+  ([#158](https://github.com/detailobsessed/unblu-mcp/pull/158),
+  [`4f9d6ac`](https://github.com/detailobsessed/unblu-mcp/commit/4f9d6ac60c55b3c853887c3ab8495257f13c9bd7))
+
+
 ## v0.9.0 (2026-03-05)
 
 ### Documentation
