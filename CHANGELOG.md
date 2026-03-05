@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 <!-- version list -->
 
+## v0.9.0 (2026-03-05)
+
+### Documentation
+
+- Update FastMCP badge from 2.14+ to 3.1+
+  ([#155](https://github.com/detailobsessed/unblu-mcp/pull/155),
+  [`172f57a`](https://github.com/detailobsessed/unblu-mcp/commit/172f57ac08ce44f4474f083b1897d7764b4caed9))
+
+### Features
+
+- Remove Eunomia, tighten progressive disclosure
+  ([#156](https://github.com/detailobsessed/unblu-mcp/pull/156),
+  [`7e329c8`](https://github.com/detailobsessed/unblu-mcp/commit/7e329c811deb1bb84d661b155473f0a41919505b))
+
+
 ## v0.8.3 (2026-03-03)
 
 ### Bug Fixes
