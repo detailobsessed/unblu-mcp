@@ -6,6 +6,7 @@ import importlib.resources
 import json
 import os
 import re
+import time
 import urllib.parse
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -27,7 +28,9 @@ from unblu_mcp._internal.models import (
     ConversationPage,
     ConversationParticipant,
     ConversationSummary,
+    DeploymentHealthReport,
     ExecuteResult,
+    HealthCheck,
     OperationMatch,
     OperationResult,
     OperationSearchResult,
@@ -405,6 +408,7 @@ Key tools discoverable via search:
 - get_conversation, assign_conversation, end_conversation
 - get_person, get_persons, search_users, get_user
 - check_agent_availability, search_named_areas
+- check_deployment_health() — 7-check health report: license, bots, webhooks, interceptors, availability
 
 ## Resources (read without a tool call)
 - api://services                  — full service catalog
@@ -1756,6 +1760,285 @@ Key tools discoverable via search:
             data=data_out,
             has_more=has_more,
             next_offset=next_offset_val,
+            next_steps=next_steps,
+        )
+
+    # ------------------------------------------------------------------
+    # Health check helpers (used by check_deployment_health)
+    # ------------------------------------------------------------------
+
+    async def _check_connectivity() -> HealthCheck:
+        try:
+            status_code, data = await _request("GET", "/accounts/getCurrentAccount")
+            if status_code >= _HTTP_CLIENT_ERROR:
+                return HealthCheck(
+                    name="connectivity",
+                    status="ERROR",
+                    message=f"HTTP {status_code} — verify UNBLU_BASE_URL, UNBLU_API_KEY, or credentials.",
+                )
+            return HealthCheck(
+                name="connectivity",
+                status="OK",
+                message=f"Connected to '{data.get('name') or data.get('id', '?')}'",
+                details=[{"account_id": data.get("id"), "account_name": data.get("name")}],
+            )
+        except Exception as e:
+            return HealthCheck(name="connectivity", status="ERROR", message=f"Connection failed: {e}")
+
+    LICENSE_EXPIRY_WARN_DAYS = 30
+    LICENSE_VALID_STATES = {"ACTIVE", "VALID"}
+
+    async def _check_license() -> HealthCheck:
+        try:
+            status_code, data = await _request("GET", "/global/read")
+            if status_code >= _HTTP_CLIENT_ERROR:
+                return HealthCheck(name="license", status="WARN", message=f"Could not read global settings (HTTP {status_code}).")
+            lic = data.get("currentLicense") or {}
+            state = lic.get("state", "UNKNOWN")
+            server_id = data.get("serverIdentifier", "?")
+            expiry_ms = lic.get("expirationTimestamp")
+            expiry_msg = ""
+            check_status = "OK"
+            if expiry_ms is not None:
+                days_left = (expiry_ms / 1000 - time.time()) / 86400
+                if days_left < 0:
+                    check_status = "ERROR"
+                    expiry_msg = f" — EXPIRED {abs(int(days_left))}d ago"
+                elif days_left < LICENSE_EXPIRY_WARN_DAYS:
+                    check_status = "WARN"
+                    expiry_msg = f" — expires in {int(days_left)}d"
+                else:
+                    expiry_msg = f" — expires in {int(days_left)}d"
+            if state not in LICENSE_VALID_STATES and check_status == "OK":
+                check_status = "WARN"
+            return HealthCheck(
+                name="license",
+                status=check_status,
+                message=f"License: {state}{expiry_msg} | Server: {server_id}",
+                details=[
+                    {
+                        "server_identifier": server_id,
+                        "license_state": state,
+                        "license_id": lic.get("licenseId"),
+                        "expiration_timestamp_ms": expiry_ms,
+                    }
+                ],
+            )
+        except Exception as e:
+            return HealthCheck(name="license", status="WARN", message=f"Could not read license: {e}")
+
+    async def _check_product_version() -> HealthCheck:
+        try:
+            status_code, data = await _request("GET", "/global/productVersion")
+            if status_code >= _HTTP_CLIENT_ERROR:
+                return HealthCheck(name="product_version", status="WARN", message=f"Could not read product version (HTTP {status_code}).")
+            version = data.get("version") or data.get("productVersion") or json.dumps(data)[:100]
+            return HealthCheck(
+                name="product_version",
+                status="OK",
+                message=f"Version: {version}",
+                details=[data],
+            )
+        except Exception as e:
+            return HealthCheck(name="product_version", status="WARN", message=f"Could not read product version: {e}")
+
+    async def _check_bots() -> HealthCheck:
+        try:
+            status_code, data = await _request(
+                "POST",
+                "/bots/search",
+                body=build_query_body(offset=0, limit=100, query_type="DialogBotQuery"),
+            )
+            if status_code >= _HTTP_CLIENT_ERROR:
+                return HealthCheck(name="bots", status="WARN", message=f"Could not list bots (HTTP {status_code}).")
+            items: list[dict[str, Any]] = data.get("items", [])
+            if not items:
+                return HealthCheck(name="bots", status="OK", message="No dialog bots configured.")
+            details = [
+                {
+                    "name": b.get("name"),
+                    "id": b.get("id"),
+                    "webhook_status": b.get("webhookStatus"),
+                    "webhook_endpoint": b.get("webhookEndpoint"),
+                }
+                for b in items
+            ]
+            inactive = [d for d in details if d["webhook_status"] not in {"ACTIVE", None}]
+            if inactive:
+                names = ", ".join(str(d["name"] or d["id"]) for d in inactive)
+                return HealthCheck(
+                    name="bots",
+                    status="WARN",
+                    message=f"{len(items)} bots found — {len(inactive)} not ACTIVE: {names}",
+                    details=details,
+                )
+            return HealthCheck(
+                name="bots",
+                status="OK",
+                message=f"{len(items)} bot(s) — all ACTIVE",
+                details=details,
+            )
+        except Exception as e:
+            return HealthCheck(name="bots", status="WARN", message=f"Could not check bots: {e}")
+
+    async def _check_webhooks() -> HealthCheck:
+        try:
+            status_code, data = await _request(
+                "POST",
+                "/webhookregistrations/search",
+                body=build_query_body(offset=0, limit=100, query_type="WebhookRegistrationQuery"),
+            )
+            if status_code >= _HTTP_CLIENT_ERROR:
+                return HealthCheck(name="webhooks", status="WARN", message=f"Could not list webhook registrations (HTTP {status_code}).")
+            items = data.get("items", [])
+            if not items:
+                return HealthCheck(name="webhooks", status="OK", message="No webhook registrations configured.")
+            details = [
+                {
+                    "name": w.get("name"),
+                    "id": w.get("id"),
+                    "api_version": w.get("apiVersion"),
+                    "endpoint": w.get("endpoint"),
+                }
+                for w in items
+            ]
+            return HealthCheck(
+                name="webhooks",
+                status="OK",
+                message=f"{len(items)} webhook registration(s)",
+                details=details,
+            )
+        except Exception as e:
+            return HealthCheck(name="webhooks", status="WARN", message=f"Could not check webhooks: {e}")
+
+    async def _check_interceptors() -> HealthCheck:
+        try:
+            status_code, data = await _request(
+                "POST",
+                "/messageinterceptors/search",
+                body=build_query_body(offset=0, limit=100, query_type="MessageInterceptorQuery"),
+            )
+            if status_code >= _HTTP_CLIENT_ERROR:
+                return HealthCheck(name="interceptors", status="WARN", message=f"Could not list interceptors (HTTP {status_code}).")
+            items = data.get("items", [])
+            if not items:
+                return HealthCheck(name="interceptors", status="OK", message="No message interceptors configured.")
+            details = [
+                {
+                    "name": ic.get("name"),
+                    "id": ic.get("id"),
+                    "webhook_status": ic.get("webhookStatus"),
+                    "webhook_endpoint": ic.get("webhookEndpoint"),
+                }
+                for ic in items
+            ]
+            inactive = [d for d in details if d["webhook_status"] not in {"ACTIVE", None}]
+            if inactive:
+                names = ", ".join(str(d["name"] or d["id"]) for d in inactive)
+                return HealthCheck(
+                    name="interceptors",
+                    status="WARN",
+                    message=f"{len(items)} interceptors — {len(inactive)} not ACTIVE: {names}",
+                    details=details,
+                )
+            return HealthCheck(
+                name="interceptors",
+                status="OK",
+                message=f"{len(items)} interceptor(s) — all ACTIVE",
+                details=details,
+            )
+        except Exception as e:
+            return HealthCheck(name="interceptors", status="WARN", message=f"Could not check interceptors: {e}")
+
+    async def _check_availability() -> HealthCheck:
+        try:
+            status_code, data = await _request("GET", "/availability/getAgentAvailability")
+            if status_code >= _HTTP_CLIENT_ERROR:
+                return HealthCheck(name="availability", status="WARN", message=f"Could not check agent availability (HTTP {status_code}).")
+            avail = data.get("agentAvailability") or data.get("availability", "UNKNOWN")
+            check_status = "OK" if avail == "AVAILABLE" else "WARN"
+            return HealthCheck(
+                name="availability",
+                status=check_status,
+                message=f"Agent availability: {avail}",
+                details=[data],
+            )
+        except Exception as e:
+            return HealthCheck(name="availability", status="WARN", message=f"Could not check availability: {e}")
+
+    # ------------------------------------------------------------------
+    # Tool 14 — check_deployment_health
+    # ------------------------------------------------------------------
+
+    @mcp.tool(
+        annotations={
+            "title": "Check Deployment Health",
+            "readOnlyHint": True,
+            "openWorldHint": False,
+        },
+    )
+    async def check_deployment_health(
+        ctx: Context,
+    ) -> DeploymentHealthReport:
+        """Check the health of the Unblu deployment in a single call.
+
+        Runs seven checks in parallel:
+        - connectivity:     confirms API connectivity and identifies the account
+        - license:          reads license state and expiry from /global/read
+        - product_version:  reports the installed Unblu version
+        - bots:             lists dialog bots and checks webhookStatus (ACTIVE = healthy)
+        - webhooks:         lists webhook registrations (informational — endpoint + apiVersion)
+        - interceptors:     lists message interceptors and checks webhookStatus
+        - availability:     checks account-wide agent availability
+
+        Returns:
+            DeploymentHealthReport with overall_status (OK/WARN/ERROR), per-check
+            results, and actionable next_steps for any failing checks.
+        """
+        await _ctx_log(ctx, "Running deployment health checks (7 checks in parallel)")
+        await provider.ensure_connection()
+        check_results: list[HealthCheck] = list(
+            await asyncio.gather(
+                _check_connectivity(),
+                _check_license(),
+                _check_product_version(),
+                _check_bots(),
+                _check_webhooks(),
+                _check_interceptors(),
+                _check_availability(),
+            )
+        )
+
+        ok_count = sum(1 for c in check_results if c.status == "OK")
+        warn_count = sum(1 for c in check_results if c.status == "WARN")
+        error_count = sum(1 for c in check_results if c.status == "ERROR")
+
+        if error_count > 0:
+            overall = "ERROR"
+        elif warn_count > 0:
+            overall = "WARN"
+        else:
+            overall = "OK"
+
+        next_steps: list[str] = []
+        for c in check_results:
+            if c.status == "ERROR":
+                next_steps.append(f"[ERROR:{c.name}] {c.message}")
+            elif c.status == "WARN":
+                next_steps.append(f"[WARN:{c.name}] {c.message}")
+        if not next_steps:
+            next_steps = [
+                "All checks passed.",
+                "Call search_conversations(status='QUEUED') to see waiting conversations.",
+                "Call search_conversations(status='ACTIVE') to see live conversations.",
+            ]
+
+        return DeploymentHealthReport(
+            overall_status=overall,
+            checks=check_results,
+            ok_count=ok_count,
+            warn_count=warn_count,
+            error_count=error_count,
             next_steps=next_steps,
         )
 

@@ -290,3 +290,30 @@ class ExecuteResult(_NextSteps):
         description="Pass as offset= on your next call to get the next page.",
     )
     truncated: bool = False
+
+
+# ---------------------------------------------------------------------------
+# Deployment health check
+# ---------------------------------------------------------------------------
+
+
+class HealthCheck(BaseModel):
+    """Result of a single deployment health sub-check."""
+
+    name: str = Field(description="Check identifier (connectivity, license, product_version, bots, webhooks, interceptors, availability).")
+    status: str = Field(description="OK, WARN, or ERROR.")
+    message: str = Field(description="Human-readable result summary.")
+    details: list[dict[str, Any]] | None = Field(
+        default=None,
+        description="Per-item breakdown (e.g., list of bots with their webhook_status).",
+    )
+
+
+class DeploymentHealthReport(_NextSteps):
+    """Full health report from check_deployment_health()."""
+
+    overall_status: str = Field(description="OK if all checks pass, WARN if any warn, ERROR if any error.")
+    checks: list[HealthCheck] = Field(description="Individual check results in order.")
+    ok_count: int = Field(description="Number of passing checks.")
+    warn_count: int = Field(description="Number of warning checks.")
+    error_count: int = Field(description="Number of failing checks.")
