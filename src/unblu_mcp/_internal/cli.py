@@ -51,12 +51,6 @@ def get_parser() -> argparse.ArgumentParser:
         help="Path to swagger.json OpenAPI spec file.",
     )
     parser.add_argument(
-        "--policy",
-        type=str,
-        default=None,
-        help="Path to Eunomia policy JSON file for authorization. Requires unblu-mcp[safety].",
-    )
-    parser.add_argument(
         "--provider",
         type=str,
         choices=["default", "k8s"],
@@ -96,7 +90,7 @@ def main(args: list[str] | None = None) -> int:
     opts = parser.parse_args(args=args)
 
     provider = _get_provider(opts.provider, opts.environment, opts.k8s_config)
-    server = _create_server(spec_path=opts.spec, policy_file=opts.policy, provider=provider)
+    server = _create_server(spec_path=opts.spec, provider=provider)
     try:
         server.run()
     except ConfigurationError as e:
@@ -129,10 +123,9 @@ def _get_provider(provider_type: str, environment: str, k8s_config: str | None =
 
 def _create_server(
     spec_path: str | None = None,
-    policy_file: str | None = None,
     provider: Any = None,
 ) -> FastMCP:
     """Lazy import to avoid circular imports and top-level import issues."""
     from unblu_mcp._internal.server import create_server  # noqa: PLC0415
 
-    return create_server(spec_path=spec_path, policy_file=policy_file, provider=provider)
+    return create_server(spec_path=spec_path, provider=provider)

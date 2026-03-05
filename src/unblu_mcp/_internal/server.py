@@ -325,7 +325,6 @@ def create_server(  # noqa: PLR0913, PLR0917, PLR0915
     username: str | None = None,
     password: str | None = None,
     provider: ConnectionProvider | None = None,
-    policy_file: str | Path | None = None,
 ) -> FastMCP:
     """Create the Unblu MCP server.
 
@@ -336,7 +335,6 @@ def create_server(  # noqa: PLR0913, PLR0917, PLR0915
         username: Username for basic auth. Defaults to UNBLU_USERNAME env var.
         password: Password for basic auth. Defaults to UNBLU_PASSWORD env var.
         provider: Optional connection provider (e.g. K8s port-forward).
-        policy_file: Optional Eunomia policy JSON for authorization.
     """
     from unblu_mcp._internal.providers import DefaultConnectionProvider  # noqa: PLC0415
 
@@ -391,22 +389,22 @@ def create_server(  # noqa: PLR0913, PLR0917, PLR0915
         name="unblu-mcp",
         lifespan=lifespan,
         mask_error_details=True,
-        instructions="""Unblu MCP Server — Debugging-Optimised API Access
+        instructions="""Unblu MCP Server — Deployment Operations & Debugging
 
-Primary use: find conversations, inspect participants, verify user/bot/agent state, audit activity.
+Primary use: verify deployment health, find conversations, inspect participants, audit activity.
 
 ## Core tools (always visible)
-- get_current_account()           — confirm connectivity and identify the account (always call first)
-- find_operation(query)           — search all 300+ Unblu API operations by keyword; returns schema inline
-- execute_operation(operation_id) — run any operation with path/query/body params
-- search_conversations(status=)   — list/filter conversations by state, assignee, or topic
-- search_persons(person_type=)    — find agents, visitors, bots by type or free-text
+- get_current_account()         — confirm connectivity and identify the account (always call first)
+- search_conversations(status=) — list/filter conversations by state, assignee, or topic
+- search_persons(person_type=)  — find agents, visitors, bots by type or free-text
 
-## Discovery — tools not shown by default
-Use search_tools(query=...) to find any tool by natural language description.
+## Discovery — use search_tools(query=...) to find any tool by description
 Then use call_tool(name=..., arguments={...}) to invoke it.
-Tools available via discovery: get_conversation, assign_conversation, end_conversation,
-get_person, get_persons, search_users, get_user, check_agent_availability, search_named_areas.
+Key tools discoverable via search:
+- find_operation / execute_operation — search and run any of 300+ API operations
+- get_conversation, assign_conversation, end_conversation
+- get_person, get_persons, search_users, get_user
+- check_agent_availability, search_named_areas
 
 ## Resources (read without a tool call)
 - api://services                  — full service catalog
@@ -437,26 +435,11 @@ get_person, get_persons, search_users, get_user, check_agent_availability, searc
             max_results=8,
             always_visible=[
                 "get_current_account",
-                "find_operation",
-                "execute_operation",
                 "search_conversations",
                 "search_persons",
             ],
         )
     )
-
-    if policy_file is not None:
-        try:
-            from eunomia_mcp import create_eunomia_middleware  # noqa: PLC0415
-
-            policy_path = Path(policy_file) if isinstance(policy_file, str) else policy_file
-            if not policy_path.exists():
-                msg = f"Policy file not found: {policy_path}"
-                raise FileNotFoundError(msg)
-            mcp.add_middleware(create_eunomia_middleware(policy_file=str(policy_path)))
-        except ImportError as e:
-            msg = "eunomia-mcp is required for policy-based authorization. Install with: pip install unblu-mcp[safety]"
-            raise ImportError(msg) from e
 
     # ------------------------------------------------------------------
     # Resources

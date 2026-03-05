@@ -114,30 +114,6 @@ Kubernetes port-forward (auto-managed):
 | `find_agent(criteria)` | Locate an agent and check their availability |
 | `account_health_check` | Validate account configuration and connectivity |
 
-## Safety
-
-By default, `execute_operation` blocks `DELETE` operations unless `confirm_destructive=True` is passed. For stricter control, install the optional Eunomia policy engine:
-
-```bash
-uv tool install "unblu-mcp[safety]"
-```
-
-Then point to a policy file:
-
-```json
-{
-  "mcpServers": {
-    "unblu": {
-      "command": "unblu-mcp",
-      "args": ["--policy", "config/mcp_policies.json"],
-      "env": { "UNBLU_BASE_URL": "...", "UNBLU_API_KEY": "..." }
-    }
-  }
-}
-```
-
-The bundled `config/mcp_policies.json` allows all read-only and curated tools while blocking destructive `execute_operation` calls by operation ID pattern.
-
 ## Development
 
 ```bash

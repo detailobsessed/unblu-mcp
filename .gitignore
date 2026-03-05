@@ -34,3 +34,4 @@ __pycache__/
 
 # mcp-publisher tokens
 .mcpregistry_*
+unblu-api.sh
