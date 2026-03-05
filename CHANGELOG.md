@@ -7,6 +7,21 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 <!-- version list -->
 
+## v0.10.1 (2026-03-05)
+
+### Bug Fixes
+
+- Update cli.py description to remove stale Token-efficient wording
+  ([#160](https://github.com/detailobsessed/unblu-mcp/pull/160),
+  [`6a52649`](https://github.com/detailobsessed/unblu-mcp/commit/6a52649038129c02a00dee31b6edfd29210f8753))
+
+### Documentation
+
+- Update server.json description to mention curated tools
+  ([#159](https://github.com/detailobsessed/unblu-mcp/pull/159),
+  [`ad7b12d`](https://github.com/detailobsessed/unblu-mcp/commit/ad7b12d1366c109e2c452d9eee6baa704c27221f))
+
+
 ## v0.10.0 (2026-03-05)
 
 ### Chores
