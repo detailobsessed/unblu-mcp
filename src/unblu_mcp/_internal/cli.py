@@ -40,7 +40,7 @@ def get_parser() -> argparse.ArgumentParser:
     """
     parser = argparse.ArgumentParser(
         prog="unblu-mcp",
-        description="Unblu MCP Server - Token-efficient access to Unblu API",
+        description="Unblu MCP Server — deployment health checks, conversation ops, and 300+ API endpoints",
     )
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {debug._get_version()}")
     parser.add_argument("--debug-info", action=_DebugInfo, help="Print debug information.")
