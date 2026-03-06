@@ -36,6 +36,26 @@ Add the server to your MCP client configuration (Claude Desktop, Windsurf, etc.)
 
 The K8s provider automatically manages `kubectl port-forward` connections to your Unblu deployment. This is the most tested configuration.
 
+Before using the K8s provider, make sure you have all of the following:
+
+- `kubectl` installed and available to the MCP client process
+- a valid Kubernetes login with access to the target namespace
+- a K8s environment map in `~/.unblu-mcp/k8s_environments.yaml`, or a custom file passed with `--k8s-config`
+
+The `--environment` value must match a key from that YAML file.
+
+Minimal example:
+
+```yaml
+environments:
+  dev:
+    local_port: 8084
+    namespace: unblu-dev
+    service: haproxy
+    service_port: 8080
+    api_path: /app/rest/v4
+```
+
 === "uvx (no install)"
 
     ```json
@@ -51,6 +71,8 @@ The K8s provider automatically manages `kubectl port-forward` connections to you
       }
     }
     ```
+
+    The `env` block is optional if your MCP client already inherits a `PATH` that includes both `uvx` and `kubectl`.
 
 === "uv tool install"
 
@@ -69,6 +91,8 @@ The K8s provider automatically manages `kubectl port-forward` connections to you
       }
     }
     ```
+
+    The `env` block is optional if your MCP client already inherits a `PATH` that includes both `unblu-mcp` and `kubectl`.
 
 See [Kubernetes Provider](kubernetes.md) for setting up your environments.
 

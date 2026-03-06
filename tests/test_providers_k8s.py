@@ -94,8 +94,8 @@ class TestK8sConnectionProvider:
         assert provider.local_port == 9999
 
     def test_init_unknown_environment_raises(self) -> None:
-        """Provider raises ValueError for unknown environment."""
-        with pytest.raises(ValueError, match="Unknown environment 'invalid'"):
+        """Provider raises ConfigurationError for unknown environment."""
+        with pytest.raises(ConfigurationError, match="Unknown environment 'invalid'"):
             K8sConnectionProvider(environment="invalid", environments=TEST_ENVIRONMENTS)
 
     def test_init_custom_environments(self) -> None:

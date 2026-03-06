@@ -114,7 +114,7 @@ def _get_provider(provider_type: str, environment: str, k8s_config: str | None =
             environments = _load_environments_from_yaml(Path(k8s_config))
             if not environments:
                 msg = f"No environments found in {k8s_config}"
-                raise ValueError(msg)
+                raise ConfigurationError(msg)
 
         return K8sConnectionProvider(environment=environment, environments=environments)
     # Default provider will be created by create_server from env vars

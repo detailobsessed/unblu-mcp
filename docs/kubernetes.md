@@ -16,7 +16,15 @@ The provider will check authentication before starting port-forward and provide 
 
 ## Configuration
 
-K8s environments are configured in `~/.unblu-mcp/k8s_environments.yaml`:
+The provider loads environments from the first of these locations that exists:
+
+- `~/.unblu-mcp/k8s_environments.yaml` for normal `uvx` or `uv tool install` usage
+- `config/k8s_environments.yaml` when running from a source checkout
+- `--k8s-config /path/to/k8s_environments.yaml` to override both
+
+The `--environment` value must match one of the keys under `environments` in that YAML file.
+
+Example:
 
 ```yaml
 environments:
@@ -57,12 +65,30 @@ environments:
 ### Command Line
 
 ```bash
-# Use the dev environment
+# Use the dev environment from ~/.unblu-mcp/k8s_environments.yaml
 unblu-mcp --provider k8s --environment dev
 
 # Use a custom config file
 unblu-mcp --provider k8s --environment my-env --k8s-config /path/to/config.yaml
 ```
+
+### MCP Client Config
+
+```json
+{
+  "mcpServers": {
+    "unblu": {
+      "command": "uvx",
+      "args": ["unblu-mcp", "--provider", "k8s", "--environment", "dev"],
+      "env": {
+        "PATH": "/Users/YOUR_USERNAME/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin"
+      }
+    }
+  }
+}
+```
+
+The `env.PATH` block is only needed if your MCP client does not already inherit a `PATH` that includes both `uvx` and `kubectl`.
 
 ### Programmatic
 

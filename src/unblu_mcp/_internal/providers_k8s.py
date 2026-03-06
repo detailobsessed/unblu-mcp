@@ -41,9 +41,11 @@ class K8sEnvironmentConfig:
 
 
 # Config file paths (relative to project root)
-_CONFIG_DIR = Path(__file__).parent.parent.parent.parent / "config"
-_USER_CONFIG = _CONFIG_DIR / "k8s_environments.yaml"
-_EXAMPLE_CONFIG = _CONFIG_DIR / "k8s_environments.example.yaml"
+_PROJECT_CONFIG_DIR = Path(__file__).parent.parent.parent.parent / "config"
+_HOME_CONFIG_DIR = Path.home() / ".unblu-mcp"
+_USER_CONFIG = _HOME_CONFIG_DIR / "k8s_environments.yaml"
+_PROJECT_CONFIG = _PROJECT_CONFIG_DIR / "k8s_environments.yaml"
+_EXAMPLE_CONFIG = _PROJECT_CONFIG_DIR / "k8s_environments.example.yaml"
 
 
 def _load_environments_from_yaml(path: Path) -> dict[str, K8sEnvironmentConfig]:
@@ -75,10 +77,10 @@ def _load_environments_from_yaml(path: Path) -> dict[str, K8sEnvironmentConfig]:
 
 def _get_default_environments() -> dict[str, K8sEnvironmentConfig]:
     """Get environment configurations from user config or example file."""
-    # Try user config first (gitignored, may contain sensitive data)
     if _USER_CONFIG.exists():
         return _load_environments_from_yaml(_USER_CONFIG)
-    # Fall back to example config
+    if _PROJECT_CONFIG.exists():
+        return _load_environments_from_yaml(_PROJECT_CONFIG)
     return _load_environments_from_yaml(_EXAMPLE_CONFIG)
 
 
@@ -114,10 +116,19 @@ class K8sConnectionProvider(ConnectionProvider):
         self._environments = environments or _get_default_environments()
 
         if isinstance(environment, str):
+            if not self._environments:
+                msg = (
+                    "No K8s environments are configured. Create ~/.unblu-mcp/k8s_environments.yaml, "
+                    "run from a source checkout with config/k8s_environments.yaml, or pass --k8s-config /path/to/k8s_environments.yaml."
+                )
+                raise ConfigurationError(msg)
             if environment not in self._environments:
                 valid = ", ".join(self._environments.keys())
-                msg = f"Unknown environment '{environment}'. Valid: {valid}"
-                raise ValueError(msg)
+                msg = (
+                    f"Unknown environment '{environment}'. Valid environments: {valid}. "
+                    f"Update ~/.unblu-mcp/k8s_environments.yaml or pass --k8s-config with the right environment map."
+                )
+                raise ConfigurationError(msg)
             self._env_config = self._environments[environment]
         else:
             self._env_config = environment

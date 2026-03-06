@@ -54,6 +54,28 @@ Direct API access with an API key:
 
 Kubernetes port-forward (auto-managed):
 
+For `--provider k8s`, you need all of the following:
+
+- `kubectl` installed and available to the MCP client process
+- a valid Kubernetes login with access to the target namespace
+- a K8s environment map in `~/.unblu-mcp/k8s_environments.yaml` or passed with `--k8s-config`
+
+The `--environment` value must match a key from that YAML file, such as `dev`, `test1`, or `t1`.
+
+Minimal config file:
+
+```yaml
+environments:
+  dev:
+    local_port: 8084
+    namespace: unblu-dev
+    service: haproxy
+    service_port: 8080
+    api_path: /app/rest/v4
+```
+
+Then point your MCP client at that environment:
+
 ```json
 {
   "mcpServers": {
@@ -67,6 +89,8 @@ Kubernetes port-forward (auto-managed):
   }
 }
 ```
+
+The `env` block is optional if your MCP client already inherits a `PATH` that includes both `uvx` and `kubectl`. Keep it if the client cannot otherwise find those binaries.
 
 ## Tools
 
