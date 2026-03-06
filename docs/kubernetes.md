@@ -22,6 +22,13 @@ The provider loads environments from the first of these locations that exists:
 - `config/k8s_environments.yaml` when running from a source checkout
 - `--k8s-config /path/to/k8s_environments.yaml` to override both
 
+Quick bootstrap:
+
+```bash
+mkdir -p ~/.unblu-mcp
+uvx unblu-mcp --print-k8s-config-template > ~/.unblu-mcp/k8s_environments.yaml
+```
+
 The `--environment` value must match one of the keys under `environments` in that YAML file.
 
 Example:

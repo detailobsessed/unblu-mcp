@@ -32,6 +32,17 @@ class _DebugInfo(argparse.Action):
         sys.exit(0)
 
 
+class _PrintK8sConfigTemplate(argparse.Action):
+    def __init__(self, nargs: int | str | None = 0, **kwargs: Any) -> None:
+        super().__init__(nargs=nargs, **kwargs)
+
+    def __call__(self, *args: Any, **kwargs: Any) -> None:  # noqa: ARG002
+        from unblu_mcp._internal.providers_k8s import _get_k8s_config_template  # noqa: PLC0415
+
+        sys.stdout.write(_get_k8s_config_template())
+        sys.exit(0)
+
+
 def get_parser() -> argparse.ArgumentParser:
     """Return the CLI argument parser.
 
@@ -44,6 +55,11 @@ def get_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("-V", "--version", action="version", version=f"%(prog)s {debug._get_version()}")
     parser.add_argument("--debug-info", action=_DebugInfo, help="Print debug information.")
+    parser.add_argument(
+        "--print-k8s-config-template",
+        action=_PrintK8sConfigTemplate,
+        help="Print a sample k8s_environments.yaml template and exit.",
+    )
     parser.add_argument(
         "--spec",
         type=str,

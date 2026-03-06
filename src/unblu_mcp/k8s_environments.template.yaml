@@ -1,0 +1,31 @@
+# Kubernetes environment configurations for unblu-mcp
+# Save this file as ~/.unblu-mcp/k8s_environments.yaml and customize it for your deployment.
+
+environments:
+  dev:
+    local_port: 8084
+    namespace: unblu-dev
+    service: haproxy
+    service_port: 8080
+    api_path: /app/rest/v4
+
+  test1:
+    local_port: 8085
+    namespace: unblu-test1
+    service: haproxy
+    service_port: 8080
+    api_path: /app/rest/v4
+
+  test2:
+    local_port: 8087
+    namespace: unblu-test2
+    service: haproxy
+    service_port: 8080
+    api_path: /app/rest/v4
+
+  prod:
+    local_port: 8086
+    namespace: unblu-prod
+    service: haproxy
+    service_port: 8080
+    api_path: /app/rest/v4

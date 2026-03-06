@@ -3,6 +3,7 @@ import shutil
 import socket
 import subprocess  # noqa: S404
 from dataclasses import dataclass
+from importlib.resources import files
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -45,7 +46,26 @@ _PROJECT_CONFIG_DIR = Path(__file__).parent.parent.parent.parent / "config"
 _HOME_CONFIG_DIR = Path.home() / ".unblu-mcp"
 _USER_CONFIG = _HOME_CONFIG_DIR / "k8s_environments.yaml"
 _PROJECT_CONFIG = _PROJECT_CONFIG_DIR / "k8s_environments.yaml"
-_EXAMPLE_CONFIG = _PROJECT_CONFIG_DIR / "k8s_environments.example.yaml"
+_TEMPLATE_RESOURCE = files("unblu_mcp").joinpath("k8s_environments.template.yaml")
+
+
+def _get_k8s_config_template() -> str:
+    """Return the canonical K8s environments YAML template."""
+    return _TEMPLATE_RESOURCE.read_text(encoding="utf-8")
+
+
+def _build_environments(data: dict[str, Any]) -> dict[str, K8sEnvironmentConfig]:
+    environments: dict[str, K8sEnvironmentConfig] = {}
+    for name, config in data.get("environments", {}).items():
+        environments[name] = K8sEnvironmentConfig(
+            name=name,
+            local_port=config["local_port"],
+            namespace=config["namespace"],
+            service=config.get("service", "haproxy"),
+            service_port=config.get("service_port", 8080),
+            api_path=config.get("api_path", "/app/rest/v4"),
+        )
+    return environments
 
 
 def _load_environments_from_yaml(path: Path) -> dict[str, K8sEnvironmentConfig]:
@@ -62,17 +82,18 @@ def _load_environments_from_yaml(path: Path) -> dict[str, K8sEnvironmentConfig]:
     with path.open(encoding="utf-8") as f:
         data: dict[str, Any] = yaml.safe_load(f) or {}
 
-    environments: dict[str, K8sEnvironmentConfig] = {}
-    for name, config in data.get("environments", {}).items():
-        environments[name] = K8sEnvironmentConfig(
-            name=name,
-            local_port=config["local_port"],
-            namespace=config["namespace"],
-            service=config.get("service", "haproxy"),
-            service_port=config.get("service_port", 8080),
-            api_path=config.get("api_path", "/app/rest/v4"),
-        )
-    return environments
+    return _build_environments(data)
+
+
+def _load_environments_from_template() -> dict[str, K8sEnvironmentConfig]:
+    try:
+        import yaml  # noqa: PLC0415
+    except ImportError as e:
+        msg = "PyYAML is required for K8s environments. Install with: pip install pyyaml"
+        raise ImportError(msg) from e
+
+    data: dict[str, Any] = yaml.safe_load(_get_k8s_config_template()) or {}
+    return _build_environments(data)
 
 
 def _get_default_environments() -> dict[str, K8sEnvironmentConfig]:
@@ -81,7 +102,7 @@ def _get_default_environments() -> dict[str, K8sEnvironmentConfig]:
         return _load_environments_from_yaml(_USER_CONFIG)
     if _PROJECT_CONFIG.exists():
         return _load_environments_from_yaml(_PROJECT_CONFIG)
-    return _load_environments_from_yaml(_EXAMPLE_CONFIG)
+    return _load_environments_from_template()
 
 
 class K8sConnectionProvider(ConnectionProvider):

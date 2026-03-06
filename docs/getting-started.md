@@ -42,6 +42,13 @@ Before using the K8s provider, make sure you have all of the following:
 - a valid Kubernetes login with access to the target namespace
 - a K8s environment map in `~/.unblu-mcp/k8s_environments.yaml`, or a custom file passed with `--k8s-config`
 
+Quick bootstrap:
+
+```bash
+mkdir -p ~/.unblu-mcp
+uvx unblu-mcp --print-k8s-config-template > ~/.unblu-mcp/k8s_environments.yaml
+```
+
 The `--environment` value must match a key from that YAML file.
 
 Minimal example:

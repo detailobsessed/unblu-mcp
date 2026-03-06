@@ -60,6 +60,13 @@ For `--provider k8s`, you need all of the following:
 - a valid Kubernetes login with access to the target namespace
 - a K8s environment map in `~/.unblu-mcp/k8s_environments.yaml` or passed with `--k8s-config`
 
+Quick bootstrap:
+
+```bash
+mkdir -p ~/.unblu-mcp
+uvx unblu-mcp --print-k8s-config-template > ~/.unblu-mcp/k8s_environments.yaml
+```
+
 The `--environment` value must match a key from that YAML file, such as `dev`, `test1`, or `t1`.
 
 Minimal config file:
